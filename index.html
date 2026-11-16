@@ -72,6 +72,7 @@
   .plan .mat{font-weight:900;color:#1E40AF;font-size:14px;text-align:center;word-break:keep-all}
   .plan .mat.off{color:#9CA3AF}
   .p-item .fee small.ctr{font-size:12px}
+  .p-line .notice{margin-top:8px;color:#B91C1C;font-weight:800;font-size:13px;line-height:1.5}
   .p-final .calc{font-size:17px;font-weight:700;color:var(--sub);margin-top:8px}
   .p-final .calc b{font-size:22px;color:var(--ink)}
   .r-calc{font-size:15px;font-weight:700;margin-top:6px}
@@ -481,6 +482,21 @@ function eqLines(monthly, months, sub, extra, total, mixed, periodLabel){
   const L = [mixed ? `${periodLabel} 구독 합계 ${n2(sub)}원` : `월 ${n2(monthly)}원 × ${months}개월 = ${n2(sub)}원`];
   if(extra > 0){ L.push(`− 추가행사 캐시백 ${n2(extra)}원`); L.push(`체감 제품가격 ${n2(total)}원`); }
   return L;
+}
+const FREED_NOTICE = '※ 만기 환급액(원금)은 토탈라이프케어 서비스를 이용하지 않은 경우에만 환급됩니다.';
+function periodText(n){ const y = Math.floor(n / 12), m = n % 12; return (y ? y + '년' : '') + (y && m ? ' ' : '') + (m ? m + '개월' : ''); }
+function freedInfoLines(q, c){
+  const st = settings, out = [], HOLD = FREED_TOTAL_TIMES - FREED_PAY_TIMES;
+  let sumPay = 0, sumMat = 0, kinds = 0;
+  st.freed.plans.forEach((p,i) => {
+    const n = Number(q.freed.counts[i]) || 0; if(!(n > 0) || !(freedPay(p) > 0)) return;
+    kinds++; sumPay += freedPay(p) * n; sumMat += freedPrice(p) * n;
+    out.push(`${p.name} ${n}구좌 · 월 납입금 ${n2(freedPay(p) * n)}원`);
+    out.push(`납입기간 ${FREED_PAY_TIMES}회(${periodText(FREED_PAY_TIMES)}) · 거치기간 ${HOLD}회(${periodText(HOLD)}, ${FREED_PAY_TIMES+1}~${FREED_TOTAL_TIMES}회)`);
+    out.push(`만기 환급액 ${manwon(freedPrice(p) * n)}`);
+  });
+  if(kinds > 1) out.push(`월 납입금 합계 ${n2(sumPay)}원 · 만기 환급액 합계 ${manwon(sumMat)}`);
+  return out;
 }
 function mulText(a, n, t){ return `월 ${n2(a)}원 × ${n}개월 ${a * n === t ? '=' : '≒'} ${n2(t)}원`; }
 function calcQuote(q, st){
@@ -909,7 +925,7 @@ function proposalModel(q, c){
   if(c.freedOff > 0){
     const parts = settings.freed.plans.map((p,i) => (Number(q.freed.counts[i])||0) > 0 ? `${p.name} ${q.freed.counts[i]}구좌` : '').filter(Boolean).join(', ');
     lines.push({ kind:'freed', label:'(-) Hi 구독플러스(적립형 결합상품) 월 지원금', sub:`${parts} · 총 ${manwon(c.freedOff*c.maxMonths)} ÷ ${c.maxMonths}개월`, amount:c.freedOff, total:c.freedOff*c.maxMonths,
-      info: settings.freed.plans.map((p,i) => { const n = Number(q.freed.counts[i])||0; return n > 0 && freedPay(p) > 0 ? `${p.name} ${n}구좌: 월 ${n2(freedPay(p)*n)}원 ${FREED_PAY_TIMES}회 납입 → ${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치(${FREED_PAY_TIMES+1}~${FREED_TOTAL_TIMES}회) → 만기 시 원금 ${manwon(freedPrice(p)*n)}` : ''; }).filter(Boolean).concat(c.slots > 1 ? ['만기 원금 합계 ' + manwon(c.freedMaturity)] : []).join(' / ') });
+      info: freedInfoLines(q, c).join(' / '), notice: FREED_NOTICE });
   }
   if(c.cardOff > 0){
     const cfg = settings.cards.find(cd => cd.name === q.card.name);
@@ -952,7 +968,7 @@ function renderProposal(){
         <div class="fee">월 ${n2(it.fee)}원<small class="ctr">계약금액 ${n2(it.contract)}원 (${it.months}개월)</small></div></div>`).join('')}
       ${m.items.length > 1 ? `<div class="p-total"><span>총 월 구독료 합계</span><span>월 ${n2(m.base)}원</span></div>` : ''}
     </div>
-    ${m.lines.map(l => `<div class="p-line"><div><div class="lb">${esc(l.label)}</div><div class="sb">${esc(l.sub)}</div>${l.info ? `<div class="sb inf">${esc(l.info).split(' / ').join('<br>')}</div>` : ''}</div><div class="am">${l.lump ? '' : '월 '}-${n2(l.amount)}원<small class="ctr">${l.lump ? '캐시백 (최종 혜택가 반영)' : m.months + '개월 혜택 합계 ' + n2(l.total) + '원'}</small></div></div>`).join('')}
+    ${m.lines.map(l => `<div class="p-line"><div><div class="lb">${esc(l.label)}</div><div class="sb">${esc(l.sub)}</div>${l.info ? `<div class="sb inf">${esc(l.info).split(' / ').join('<br>')}</div>` : ''}${l.notice ? `<div class="sb notice">${esc(l.notice)}</div>` : ''}</div><div class="am">${l.lump ? '' : '월 '}-${n2(l.amount)}원<small class="ctr">${l.lump ? '캐시백 (최종 혜택가 반영)' : m.months + '개월 혜택 합계 ' + n2(l.total) + '원'}</small></div></div>`).join('')}
     <div class="p-final ${m.refund ? 'refund' : ''}">
       <span class="ch">${esc(m.chip)}</span>
       <div class="t">${m.refund ? '💰' : '🎯'} 최종 월 체감가 (${esc(m.periodLabel)} 구독)</div>
@@ -970,7 +986,7 @@ function quoteText(){
   const L = ['[구독 견적]'];
   m.items.forEach(it => L.push(`${it.name}${it.model ? ' (' + it.model + ')' : ''} · ${it.months}개월 · 월 ${n2(it.fee)}원 (계약금액 ${n2(it.contract)}원)`));
   if(m.items.length > 1) L.push(`총 월 구독료 합계: ${n2(m.base)}원`);
-  m.lines.forEach(l => { L.push(l.lump ? `${l.label}: -${n2(l.amount)}원 (최종 혜택가 반영)` : `${l.label}: -${n2(l.amount)}원 (${m.months}개월 합계 ${n2(l.total)}원)`); if(l.info) L.push('   · ' + l.info); });
+  m.lines.forEach(l => { L.push(l.lump ? `${l.label}: -${n2(l.amount)}원 (최종 혜택가 반영)` : `${l.label}: -${n2(l.amount)}원 (${m.months}개월 합계 ${n2(l.total)}원)`); if(l.info) l.info.split(' / ').forEach(t => L.push('   · ' + t)); if(l.notice) L.push('   ' + l.notice); });
   L.push(`▶ 최종 월 체감가: ${n2(m.monthly)}원${m.refund ? ' (매월 ' + n2(-m.monthly) + '원 환급)' : ''}`);
   m.eq.forEach(t => L.push('   · ' + t));
   if(m.refund) L.push(`▶ 총 환급액: ${n2(m.refundTotal)}원 (월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})`);
@@ -1044,11 +1060,12 @@ async function saveImage(){
 
   m.lines.forEach(l => {
     const infoLines = l.info ? l.info.split(' / ') : [];
-    const h = 112 + infoLines.length * 34;
+    const h = 112 + infoLines.length * 34 + (l.notice ? 44 : 0);
     rr(x, P, y, IW, h, 24); x.fillStyle = '#EFF4FF'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#DBE5FF'; x.stroke();
     x.textAlign = 'left'; x.font = `800 30px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, l.label, 640), P+32, y+46);
     x.font = `500 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(fitText(x, l.sub, 640), P+32, y+84);
     infoLines.forEach((ln, k) => { x.textAlign = 'left'; x.font = `700 20px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, ln, IW-72), P+32, y+126+k*32); });
+    if(l.notice){ x.textAlign = 'left'; x.font = `800 20px ${FONT}`; x.fillStyle = '#B91C1C'; x.fillText(fitText(x, l.notice, IW-72), P+32, y+132+infoLines.length*32); }
     x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#2F5BFF'; x.fillText(`${l.lump ? '' : '월 '}-${n2(l.amount)}원`, W-P-32, y+56);
     x.font = `600 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(l.lump ? '캐시백 (최종 혜택가 반영)' : `${m.months}개월 혜택 합계 ${n2(l.total)}원`, W-P-32, y+90);
     y += h + 16;
