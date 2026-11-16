@@ -366,7 +366,7 @@
   <nav class="navwrap">
     <button class="navbtn" data-go="home">🏠 홈</button>
     <button class="navbtn" data-go="quote">🧮 <span class="long">구독 </span>견적</button>
-    <button class="navbtn" data-go="care">📋 <span class="long">안심케어 </span>조견표</button>
+    <a class="navbtn" href="https://hi-plan.netlify.app/" target="_blank" rel="noopener noreferrer">📊 <span class="long">하이플랜 </span>혜택 계산기</a>
     <button class="navbtn" data-go="card">💳 <span class="long">카드</span>할부</button>
     <span class="spacer"></span>
     <button class="navbtn gear" data-go="settings" id="aiBtn" aria-label="설정 (AI 키 · 카드 혜택표 · 프리드)" title="설정">⚙<span class="dot" id="aiDot"></span></button>
@@ -604,14 +604,13 @@ function loadHome(){
   const h = lsGet('hiw_home_v1', {}) || {};
   return {
     events: Array.isArray(h.events) ? h.events : (Array.isArray(h.todos) ? h.todos.filter(t => t && t.t).map(t => ({ id: 'm' + Math.random().toString(36).slice(2, 8), date: ymd(new Date()), time: '', text: String(t.t), type: 'todo', done: !!t.done })) : []),
-    links: Array.isArray(h.links) ? h.links : [],
+    links: Array.isArray(h.links) ? h.links.filter(l => !(l && l.url === 'https://hi-plan.netlify.app/')) : [],
     seeded: Array.isArray(h.seeded) ? h.seeded : [],
     restoredV2: !!h.restoredV2
   };
 }
 // 기본 제공 바로가기: 처음 한 번만 추가되고, 지우면 다시 나타나지 않음
 const DEFAULT_LINKS = [
-  { id:'hiplan', name:'하이플랜 혜택 계산기', url:'https://hi-plan.netlify.app/' },
   { id:'allcare', name:'가전수리올케어 판매 가이드', doc:'allcare' },
   { id:'insclaim', name:'보험 청구 가이드', doc:'insclaim' },
   { id:'kobang', name:'견적 계산기 (방충망·유리난간·열차단필름)', url:'https://kobang.netlify.app/' }
@@ -753,7 +752,7 @@ function renderHome(){
     <div class="step-title"><h2>STEP 01 · 맞춤 견적 &amp; 카드 혜택 설계</h2><span class="chip blue">36개월 기본 · 카드/구독플러스 혜택 계산</span></div>
     <div class="tiles">
       <button class="tile" data-go="quote"><b>구독 견적</b><span>품목 · 카드 · 프리드 자동 계산</span></button>
-      <button class="tile light" data-go="care"><b>📋 안심케어 조견표</b><span>${esc(CARE_MONTH)} 안심케어 · 가전이사</span></button>
+      <a class="tile light" href="https://hi-plan.netlify.app/" target="_blank" rel="noopener noreferrer"><b>📊 하이플랜 혜택 계산기</b><span>새 탭에서 열려요</span></a>
       <button class="tile light" data-go="card"><b>💳 카드 할부 행사</b><span>${esc(CARD_TITLE.replace(" 카드 할부 행사",""))} 카드사별 무이자 조건</span></button>
     </div>
   </section>
@@ -766,6 +765,7 @@ function renderHome(){
   <section class="card">
     <div class="step-title"><h2>STEP 03 · 업무 바로가기 허브</h2><span class="muted">링크 추가·삭제는 ⚙ 설정에서</span></div>
     <div class="tiles linkgrid">
+      <div class="linkcell"><button class="tile link" data-go="care"><b>📋 안심케어 조견표</b><span>${esc(CARE_MONTH)} 안심케어 · 가전이사</span></button></div>
       ${home.links.map((l,i)=>`
         <div class="linkcell">
           ${l.doc && (DOCS[l.doc] || DOC_IMG[l.doc])
@@ -773,7 +773,7 @@ function renderHome(){
             : `<a class="tile link" href="${esc(l.url || '#')}" target="_blank" rel="noopener noreferrer"><b>${esc(l.name)}</b><span>${esc(String(l.url || '').replace(/^https?:\/\//,''))}</span></a>`}
         </div>`).join('')}
     </div>
-    ${home.links.length ? '' : '<div class="muted">등록된 링크가 없어요. 오른쪽 위 ⚙ 설정에서 추가하세요.</div>'}
+    ${home.links.length ? '' : '<div class="muted">추가 링크가 없어요. 오른쪽 위 ⚙ 설정에서 추가하세요.</div>'}
   </section>`;
   tickClock();
 }
