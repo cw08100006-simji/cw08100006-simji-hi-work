@@ -821,7 +821,7 @@ function freedSectionHTML(q, c){
       <button class="btn ghost" data-act="freedReset">↺ 미적용(초기화)</button></div></div>
     <div class="grid3 keep">
       ${plans.map((p,i) => { const cnt = Number(q.freed.counts[i])||0; return `
-        <div class="plan ${cnt>0?'on':''}"><b>${esc(p.name)}</b><span class="red-t">월 -${n2(freedUnit(p, c.maxMonths))}원 지원</span><small class="ctr pt">총 ${freedTotal(p)%10000===0 ? n2(freedTotal(p)/10000)+'만원' : n2(freedTotal(p))+'원'}<br>÷ ${c.maxMonths}개월</small>${freedPay(p) > 0 ? `<small class="ctr pt" style="color:#4B5563">${cnt>0 ? cnt : 1}구좌 월 ${n2(freedPay(p)*Math.max(cnt,1))}원 ${FREED_PAY_TIMES}회 납입<br>${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치 후</small><span class="mat ${cnt>0?'':'off'}">만기 원금 ${manwon(freedPrice(p)*Math.max(cnt,1))}</span>` : ''}
+        <div class="plan ${cnt>0?'on':''}"><b>${esc(p.name)}</b><span class="red-t">월 -${n2(freedUnit(p, c.maxMonths) * Math.max(cnt,1))}원 지원</span><small class="ctr pt">총 ${manwon(freedTotal(p) * Math.max(cnt,1))}<br>÷ ${c.maxMonths}개월</small>${freedPay(p) > 0 ? `<small class="ctr pt" style="color:#4B5563">${cnt>0 ? cnt : 1}구좌 월 ${n2(freedPay(p)*Math.max(cnt,1))}원 ${FREED_PAY_TIMES}회 납입<br>${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치 후</small><span class="mat ${cnt>0?'':'off'}">만기 원금 ${manwon(freedPrice(p)*Math.max(cnt,1))}</span>` : ''}
           <div class="stepper"><button class="step" data-act="freedDec" data-i="${i}" ${cnt<=0?'disabled':''} aria-label="줄이기">−</button><span>${cnt}개</span>
           <button class="step plus" data-act="freedInc" data-i="${i}" ${c.slots>=max?'disabled':''} aria-label="늘리기">＋</button></div></div>`; }).join('')}
     </div></div>`;
