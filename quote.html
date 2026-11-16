@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F5F2EC">
+<title>구독 견적 계산기</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F2EC; --card:#FFFFFF; --ink:#15171C; --sub:#6B7280; --line:#E8E3D9;
+    --blue:#2F5BFF; --blue-soft:#EEF3FF; --red:#D81B45; --red-soft:#FDF1F4;
+    --brown:#8A5328; --amber-soft:#FFF6E5; --dark:#12182B; --purple:#4F46E5; --green:#16A34A;
+    --radius:22px;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;padding-bottom:calc(110px + env(safe-area-inset-bottom));}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;padding:0}
+  button:disabled{opacity:.35;cursor:not-allowed}
+  input,select{font-family:inherit;font-size:16px;color:var(--ink)}
+  a{color:inherit}
+
+  /* ---------- 상단 메뉴 ---------- */
+  .topnav{position:sticky;top:0;z-index:30;background:rgba(245,242,236,.94);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line);padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top));}
+  .navwrap{max-width:1100px;margin:0 auto;display:flex;gap:8px;align-items:center;overflow-x:auto;scrollbar-width:none}
+  .navwrap::-webkit-scrollbar{display:none}
+  .navbtn{white-space:nowrap;padding:10px 16px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:700;font-size:14px}
+  .navbtn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .navbtn.ai{background:var(--purple);color:#fff;border-color:var(--purple)}
+  .navbtn.ai.off{background:#fff;color:var(--purple)}
+  .spacer{flex:1}
+  .navbtn.gear{position:sticky;right:0;margin-left:auto;width:44px;height:44px;padding:0;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center;flex:none}
+  .navbtn.gear.active{background:var(--ink);color:#fff}
+  .navbtn.gear .dot{position:absolute;top:6px;right:6px;width:10px;height:10px;border-radius:50%;background:#F5A623;border:2px solid #fff}
+  .navbtn.gear .dot.on{background:var(--green)}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px}
+
+  /* ---------- 공통 ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:16px;
+    box-shadow:0 6px 24px rgba(40,30,10,.05)}
+  .muted{color:var(--sub);font-size:14px;line-height:1.5}
+  h1{font-size:clamp(20px,3vw,27px);margin:0 0 6px;font-weight:900;letter-spacing:-.01em}
+  h2{font-size:18px;margin:0;font-weight:800}
+  h3{margin:0;font-size:18px;font-weight:800}
+  .sec-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .row-gap{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row-gap.end{justify-content:flex-end}
+  .btn{padding:10px 16px;border-radius:14px;font-weight:700;font-size:14px;white-space:nowrap;min-height:42px}
+  .btn.primary{background:var(--blue);color:#fff}
+  .btn.soft{background:var(--blue-soft);color:var(--blue);border:1px solid #D6E0FF}
+  .btn.ghost{background:#fff;border:1px solid var(--line)}
+  .btn.red{background:var(--red);color:#fff}
+  .btn.dark{background:var(--dark);color:#fff}
+  .btn.block{width:100%;min-height:58px;font-size:18px;border-radius:18px}
+  .chip{display:inline-block;padding:5px 11px;border-radius:999px;background:#F1F2F5;font-size:12.5px;font-weight:700;color:#4B5563}
+  .chip.red{background:var(--red-soft);color:var(--red);border:1px solid #F9CBD6}
+  .chip.blue{background:var(--blue-soft);color:var(--blue);border:1px solid #D6E0FF}
+  .in{border:1px solid var(--line);background:#fff;border-radius:12px;padding:11px 13px;min-width:0;width:100%}
+  .in:focus,select:focus{outline:2px solid #C7D5FF;border-color:var(--blue)}
+  .grow{flex:1 1 160px}
+  .money{display:flex;align-items:center;gap:6px;flex:0 1 190px;font-weight:700;color:var(--sub)}
+  .money .in{text-align:right;font-weight:800}
+  .money .fee-in{font-size:22px;font-weight:900}
+  .contract{font-size:11px;font-weight:600;color:var(--sub);margin:2px 0 8px 2px}
+  .item-no{font-weight:800;color:var(--sub);font-size:14px}
+  .plan .mat{font-weight:900;color:#1E40AF;font-size:14px;text-align:center;word-break:keep-all}
+  .plan .mat.off{color:#9CA3AF}
+  .p-item .fee small.ctr{font-size:12px}
+  .p-final .calc{font-size:17px;font-weight:700;color:var(--sub);margin-top:8px}
+  .p-final .calc b{font-size:22px;color:var(--ink)}
+  .r-calc{font-size:15px;font-weight:700;margin-top:6px}
+  .field{display:flex;flex-direction:column;gap:6px;margin-top:14px;font-weight:700;font-size:14px}
+  .field.inline{flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap}
+  .icon-btn{width:38px;height:38px;border-radius:12px;background:#F4F4F5;font-weight:800;color:#6B7280;flex:none}
+  .seg{display:inline-flex;background:#F1F2F5;border-radius:16px;padding:4px;gap:4px;flex:none}
+  .segbtn{padding:10px 18px;border-radius:12px;font-weight:700;font-size:15px;color:#6B7280;white-space:nowrap}
+  .segbtn.on{background:var(--blue);color:#fff}
+  .segbtn.on.red{background:var(--red)}
+  .segbtn small{font-weight:600;opacity:.9;margin-left:4px}
+  .seg.small .segbtn{padding:9px 13px;font-size:14px}
+  .warn{margin-top:8px;font-size:13px;color:#B45309;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:8px 10px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .flexwrap{display:flex;gap:10px;flex-wrap:wrap}
+  .flexwrap>*{flex:1 1 120px}
+
+  /* ---------- 홈 ---------- */
+  .hero{display:flex;gap:18px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+  .hero-l{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .ring{width:98px;height:98px;border-radius:50%;border:9px solid #F5A623;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none}
+  .ring.none{border-color:#E5E7EB}
+  .ring.today{border-color:var(--green)}
+  .ring small{font-size:10px;font-weight:800;color:#6B7280;letter-spacing:.05em}
+  .ring b{font-size:24px;font-weight:900}
+  .inline-field{display:inline-flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;font-weight:700;color:var(--sub)}
+  .inline-field input{border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+  .hero-r{text-align:right}
+  .clock{font-size:42px;font-weight:900;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .briefing{background:var(--dark);color:#fff;border-radius:28px;padding:24px 26px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  .briefing .kicker{color:#38BDF8;font-weight:800;font-size:13px;letter-spacing:.06em;margin-bottom:6px}
+  .briefing .bt{font-size:clamp(17px,2.6vw,24px);font-weight:900}
+  .step-title{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+  .step-title h2{color:var(--brown);font-weight:900}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:24px 14px;border-radius:20px;
+    background:var(--dark);color:#fff;min-height:112px;text-decoration:none}
+  .tile b{font-size:19px;font-weight:900}
+  .tile span{font-size:14px;font-weight:700;color:#7DD3FC}
+  .tile.light{background:#FBF8F2;color:var(--ink);border:1px solid var(--line)}
+  .tile.light span{color:var(--sub)}
+  .tile.link{background:#FBF8F2;color:var(--ink);border:1px solid var(--line);min-height:84px;padding:16px 12px}
+  .tile.link b{font-size:16px}
+  .tile.link span{color:var(--sub);font-size:12px;word-break:break-all}
+  .tile.add{border:2px dashed #D6CDBB;background:transparent;color:var(--sub)}
+  .linkcell{position:relative}
+  .linkcell .icon-btn{position:absolute;top:6px;right:6px;width:28px;height:28px;font-size:12px;background:#fff}
+  .briefing .bl{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:7px}
+  .briefing .bl li{font-size:15px;font-weight:600;color:#E5E7EB;line-height:1.4}
+  .briefing .bl li.done{text-decoration:line-through;color:#6B7280}
+  .briefing .bl li.more{color:#94A3B8;font-size:13px}
+  .briefing .bl b{color:#7DD3FC;font-variant-numeric:tabular-nums}
+  .tg{display:inline-block;font-size:11px;font-weight:800;padding:2px 7px;border-radius:7px;margin-right:7px;vertical-align:1px}
+  .tg.t-todo{background:#DBEAFE;color:#1E40AF}.tg.t-note{background:#FEF3C7;color:#92400E}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+  .cal-head b{font-size:18px;font-weight:900}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;width:100%}
+  .cal-dow{text-align:center;font-size:12px;font-weight:800;color:var(--sub);padding:4px 0}
+  .cal-dow:first-child,.cal-day.sun{color:#DC2626}.cal-dow:nth-child(7),.cal-day.sat{color:#2563EB}
+  .cal-day{min-width:0;width:100%;aspect-ratio:1/1.05;min-height:46px;border-radius:12px;background:#FBFAF7;border:1px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:6px;gap:3px;font-weight:700;font-size:14px}
+  .cal-day.out{opacity:.35}
+  .cal-day.today{border-color:var(--blue);background:var(--blue-soft)}
+  .cal-day.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .cal-dots{display:flex;gap:3px;min-height:6px}
+  .cal-dots i{width:6px;height:6px;border-radius:50%;background:#3B82F6}
+  .cal-dots i.note{background:#F59E0B}
+  .cal-dots i.done{opacity:.35}
+  .ev{display:flex;align-items:flex-start;gap:10px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .ev input[type=checkbox]{width:22px;height:22px;accent-color:var(--blue);flex:none;margin-top:1px}
+  .ev-t{flex:1;min-width:0;font-weight:600;line-height:1.4;word-break:break-word}
+  .ev.done .ev-t{text-decoration:line-through;color:#9CA3AF}
+  .ev-t b{color:var(--blue);font-variant-numeric:tabular-nums;margin-right:4px}
+  .ev-form{display:grid;grid-template-columns:110px 84px 110px 1fr auto;gap:8px;margin-top:12px}
+  .daysheet .ev-form{margin-top:14px}
+  .card,.briefing{max-width:100%}
+  #homeRoot{min-width:0}
+  main{overflow-x:clip}
+  @media (max-width:420px){.cal-grid{gap:3px}.cal-day{min-height:42px;font-size:13px;border-radius:10px;padding-top:5px}.cal-head b{font-size:16px}.cal-head .btn{padding:8px 12px}.card{padding:14px}}
+  @media (max-width:760px){#settingsRoot .ev-form{grid-template-columns:1fr !important}#settingsRoot .ev-form .ev-text{grid-column:auto}.ev-form{grid-template-columns:1.1fr .9fr 1.2fr}.ev-form .ev-text{grid-column:1/4}.ev-form .btn{grid-column:1/4}}
+  .notif-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px;padding:12px 14px;background:#F7F5F0;border-radius:14px}
+  .addrow{display:flex;gap:8px;margin-top:12px}
+
+  /* ---------- 견적 ---------- */
+  .qhead{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+  .qtitle{font-weight:900;font-size:20px}
+  .tabs-card{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px}
+  .item{background:#F7F5F0;border:1px solid var(--line);border-radius:18px;padding:12px;margin-bottom:10px}
+  .item-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+  .item-row:last-child{margin-bottom:0}
+  .item-row.sub{margin-top:2px}
+  .sum-line{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:10px;font-weight:800;font-size:14px}
+  .sum-line .l{color:var(--red)}
+  .pill{flex:1 1 110px;padding:15px 8px;border-radius:16px;background:#fff;border:1px solid var(--line);font-weight:800;font-size:15px;text-align:center}
+  .pill.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .pill.dis,.pill:disabled{opacity:.35;cursor:not-allowed;background:#F1F2F5}
+  .tier{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border-radius:16px;background:#F4F3EF;border:2px solid transparent;font-weight:700}
+  .tier b{font-size:18px;font-weight:900}
+  .tier.on{background:var(--blue-soft);border-color:var(--blue);color:#1E3A8A}
+  .plan{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 10px;border-radius:18px;border:2px solid var(--line);background:#fff}
+  .plan b{font-size:18px;font-weight:900;color:#1E40AF}
+  .plan .red-t{color:var(--red);font-weight:800;font-size:14px}
+  .plan.on{border-color:var(--blue);background:var(--blue-soft)}
+  .stepper{display:flex;align-items:center;justify-content:space-between;width:100%;background:#F1F2F5;border-radius:14px;padding:5px;margin-top:6px}
+  .stepper span{font-weight:900}
+  .step{width:40px;height:40px;border-radius:11px;background:#fff;font-size:20px;font-weight:900}
+  .step.plus{background:var(--blue);color:#fff}
+  .result{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--red-soft);border:2px solid #F9CBD6;border-radius:20px;padding:18px 20px}
+  .r-title{font-weight:900;color:#9F1239;font-size:14.5px}
+  .r-sub{color:var(--sub);font-size:14px;margin-top:4px}
+  .r-big.neg{color:#059669}
+  .warn.ok{color:#047857;background:#ECFDF5;border-color:#A7F3D0}
+  .result:has(.r-big.neg){background:#ECFDF5;border-color:#A7F3D0}
+  .r-big{font-size:clamp(28px,5vw,40px);font-weight:900;color:var(--red);letter-spacing:-.02em}
+  .floatbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:40;
+    width:min(720px,calc(100% - 24px));background:var(--dark);color:#fff;border-radius:20px;padding:12px 14px 12px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 14px 34px rgba(0,0,0,.28)}
+  .floatbar .fl{font-size:13px;color:#CBD5E1;font-weight:700}
+  .floatbar .fv{font-size:clamp(20px,4vw,26px);font-weight:900}
+
+  /* ---------- 제안서 ---------- */
+  .ptool{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+  .paper{background:#fff;border:1px solid var(--line);border-radius:28px;padding:22px;box-shadow:0 10px 30px rgba(20,20,40,.08)}
+  .p-head{background:#111827;color:#fff;border-radius:22px;padding:22px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .p-head .tag{display:inline-block;font-size:13px;font-weight:800;color:#FDA4AF;background:rgba(244,63,94,.16);padding:4px 11px;border-radius:999px;margin-bottom:8px}
+  .p-head h1{margin:0;font-size:clamp(20px,3.4vw,30px);color:#fff}
+  .p-head .badge{font-size:13px;font-weight:700;border:1px solid #374151;border-radius:14px;padding:9px 13px;color:#E5E7EB}
+  .p-box{border:1px solid var(--line);background:#F9FAFB;border-radius:20px;padding:6px 18px;margin-bottom:12px}
+  .p-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .p-item:last-child{border-bottom:none}
+  .p-item .nm{font-size:22px;font-weight:900}
+  .p-item .meta{color:var(--sub);font-size:14px;margin-top:4px}
+  .p-item .fee{font-size:24px;font-weight:900}
+  .p-total{display:flex;justify-content:space-between;padding:12px 0;font-weight:800;color:var(--red)}
+  .p-line{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#EFF4FF;border:1px solid #DBE5FF;border-radius:18px;padding:16px 18px;margin-bottom:10px}
+  .p-line .lb{font-weight:900;font-size:17px;color:#1E3A8A}
+  .p-line .sb.inf{margin-top:5px;font-weight:700;color:#1E3A8A}
+  .p-line .sb{font-size:13px;color:#4B5563;margin-top:3px}
+  .ctr{display:block;font-size:12px;font-weight:700;color:#6B7280;margin-top:2px;text-align:right;white-space:nowrap}
+  .plan .ctr.pt{white-space:normal;word-break:keep-all;text-align:center;font-size:12px;line-height:1.35;margin-top:0;max-width:100%}
+  .p-line .am{font-weight:900;font-size:clamp(20px,3vw,26px);color:var(--blue);white-space:nowrap}
+  .p-final{text-align:center;background:var(--red-soft);border:2px solid #FB7185;border-radius:24px;padding:22px 14px;margin:14px 0}
+  .p-final .ch{display:inline-block;background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:700;font-size:13px;color:var(--sub)}
+  .p-final .t{margin-top:10px;font-weight:900;color:#BE123C}
+  .p-final.refund{background:#ECFDF5;border-color:#34D399}
+  .p-final.refund .t{color:#047857}
+  .p-final.refund .big{color:#059669}
+  .p-final .rf2{margin-top:10px;display:inline-block;background:#fff;border:2px solid #34D399;border-radius:14px;padding:8px 16px;font-size:17px;font-weight:800;color:#047857}
+  .p-final .rf2 b{font-size:22px}
+  .p-final .rf2 small{display:block;font-size:12px;font-weight:700;color:#6B7280;margin-top:2px}
+  .p-final .rf{margin-top:8px;font-weight:800;color:#047857;font-size:15px}
+  .p-final .big{font-size:clamp(40px,10vw,72px);font-weight:900;color:var(--red);letter-spacing:-.02em;margin-top:6px}
+  .p-sum{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#111827;color:#fff;border-radius:20px;padding:18px 22px}
+  .p-sum b{font-size:clamp(22px,4vw,32px);font-weight:900}
+  .p-sum small{color:#9CA3AF;margin-left:8px}
+  .p-foot{margin-top:12px;text-align:center;font-size:12px;color:#9CA3AF}
+
+  /* ---------- 모달/토스트 ---------- */
+  .overlay{position:fixed;inset:0;background:rgba(10,12,20,.55);z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0}
+  .modal{background:#fff;width:min(920px,100%);max-height:92vh;overflow:auto;border-radius:26px 26px 0 0;padding:20px}
+  @media (min-width:700px){ .overlay{align-items:center;padding:20px} .modal{border-radius:26px} }
+  .m-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .m-grid{display:grid;grid-template-columns:200px 1fr;gap:16px}
+  .thumb{width:100%;border-radius:14px;border:1px solid var(--line);max-height:300px;object-fit:contain;background:#111}
+  .m-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .rc-sub{font-weight:800;margin:14px 0 8px;font-size:15px}
+  .rc-warn{background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:10px 12px;font-size:13px;color:#92400E;margin-top:10px}
+  .chk{display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:700;font-size:14px}
+  .busy{background:#fff;border-radius:22px;padding:28px 34px;text-align:center;font-weight:800;align-self:center}
+  .spin{width:34px;height:34px;border:4px solid #E5E7EB;border-top-color:var(--blue);border-radius:50%;margin:0 auto 12px;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  #toast{position:fixed;left:50%;top:76px;transform:translateX(-50%);z-index:80;background:#111827;color:#fff;padding:12px 18px;border-radius:14px;font-weight:700;font-size:14px;max-width:calc(100% - 32px);box-shadow:0 10px 24px rgba(0,0,0,.25)}
+  table.cfg{width:100%;border-collapse:collapse;margin-top:8px}
+  table.cfg td{padding:5px 4px}
+  .cfg-card{border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:12px;background:#FBFAF7}
+
+  .docview{position:fixed;inset:0;z-index:70;background:#fff;display:flex;flex-direction:column}
+  .docbar{display:flex;align-items:center;gap:10px;padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top));background:var(--bg);border-bottom:1px solid var(--line)}
+  .docbar b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+  .docimg{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;background:#F3F4F6;padding:10px;text-align:center}
+  .docimg img{width:100%;max-width:900px;height:auto;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+  .docview iframe{flex:1;width:100%;border:0;background:#fff}
+  .linkgrid{grid-template-columns:repeat(3,minmax(0,1fr)) !important}
+  .linkgrid .linkcell,.linkgrid>.tile{height:104px;min-width:0}
+  .linkgrid .tile{width:100%;min-height:0;padding:12px 14px;gap:4px;overflow:hidden}
+  .linkgrid .linkcell .tile{height:100%;padding:12px 14px}
+  .linkgrid>.tile{height:104px}
+  .linkgrid .tile b{font-size:15px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all}
+  .linkgrid .tile span{font-size:12px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal}
+  .linkgrid .linkcell .icon-btn{z-index:2}
+  @media (max-width:760px){.linkgrid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}}
+  .tiles.four{grid-template-columns:repeat(4,1fr)}
+  .tiles.two{grid-template-columns:repeat(2,1fr)}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+  .pill2{padding:9px 14px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:700;font-size:13.5px}
+  .pill2.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .cr-note{margin-top:4px;font-size:12.5px;color:#92400E;font-weight:600}
+  .cr-p .pt{font-size:14px;color:var(--sub)}
+  .cinfo{margin:0 0 6px;padding:10px 14px 10px 28px;background:#F7F5F0;border-radius:12px;font-size:13px;color:#4B5563;line-height:1.55}
+  .care-sec .sec-head{margin-bottom:8px}
+  .cg{margin-top:14px}
+  .cg-t{font-weight:900;color:var(--brown);font-size:15px;padding:0 4px 6px;border-bottom:2px solid var(--line)}
+  .cr{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 8px;border-bottom:1px dashed var(--line)}
+  .cr.hl{background:#FFFBD6;border-radius:10px}
+  .cr-n{font-weight:700;font-size:15px;line-height:1.35}
+  .cr-code{display:block;margin-top:4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px;color:#475569;background:#F1F2F5;border-radius:8px;padding:4px 8px;text-align:left;word-break:break-all}
+  .cr-p{font-weight:900;font-size:19px;white-space:nowrap;text-align:right}
+  .cr-p span{font-size:13px;font-weight:700;color:var(--sub);margin-left:2px}
+  .cr-p small{font-size:15px}
+  .care-orig summary{cursor:pointer;font-size:15px;list-style:none}
+  .care-orig summary::-webkit-details-marker{display:none}
+  .care-orig summary::before{content:'▸ ';color:var(--sub)}
+  .care-orig[open] summary::before{content:'▾ '}
+  .care-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .care-viewer{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:auto;-webkit-overflow-scrolling:touch;
+    height:calc(100vh - 250px);min-height:420px;padding:10px}
+  .care-row{display:flex;gap:14px;align-items:flex-start;width:max-content}
+  .care-row img{display:block;height:auto;flex:none;border:1px solid var(--line)}
+  @media (max-width:760px){
+    .navbtn.long,.navbtn .long{display:none}
+    .navbtn{padding:10px 13px}
+    @media (max-width:420px){ .navbtn{padding:8px 9px;font-size:13px} .navwrap{gap:4px} }
+    .tiles.four,.tiles.two{grid-template-columns:1fr}
+    .tiles{grid-template-columns:1fr}
+    .grid3{grid-template-columns:1fr}
+    .grid3.keep{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    .plan{padding:12px 6px;gap:4px;border-radius:14px;min-width:0}
+    .plan b{font-size:14px;text-align:center;word-break:keep-all;overflow-wrap:anywhere}
+    .plan .red-t{font-size:12px;text-align:center;word-break:keep-all}
+    .stepper{padding:3px;border-radius:12px;gap:2px}
+    .stepper span{font-size:13px;white-space:nowrap}
+    .stepper{flex-wrap:wrap;justify-content:center;background:none;padding:0;gap:6px}
+    .stepper span{order:-1;width:100%;text-align:center;font-size:15px}
+    .stepper .step{flex:1 1 0;min-width:0;width:auto;height:34px;padding:0;font-size:18px;background:#F1F2F5}
+    .stepper .step.plus{background:var(--blue)}
+    .m-grid{grid-template-columns:1fr}
+    .p-line{flex-wrap:wrap}
+    .p-line>div:first-child{flex:1 1 100%}
+    .p-line .am{margin-left:auto;text-align:right}
+    .hero-r{text-align:left}
+    .card{padding:16px;border-radius:20px}
+    .money{flex:1 1 140px}
+  }
+  /* 카드 할부 */
+  .cx{display:inline-flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:9px;font-size:13px;line-height:1.3;max-width:100%;text-align:center;align-items:center}
+  .cx b{font-weight:800}.cx i{font-style:normal;font-size:11px;font-weight:600;opacity:.85}
+  .ct-f{background:#FDE047;color:#1F2937}.ct-l{background:#DBE7FA;color:#1E3A8A}.ct-s{background:#E3EAD6;color:#1F2937}
+  .ct-p{background:#F8D7DC;color:#7F1D1D}.ct-c{background:#F1F2F5;color:#374151}.ct-x{background:#4B4B4B;color:#fff}
+  .cx.box{outline:3px solid #DC2626;outline-offset:-1px}
+  .cd-notes summary{cursor:pointer;font-size:14px}.cd-notes ul{margin:10px 0 0;padding-left:18px;font-size:13.5px;color:#4B5563}.cd-notes li{margin:4px 0}
+  .cd-notes{margin-bottom:12px}
+  .cd-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .cd-chips-g{align-items:center}
+  .cd-g{font-size:12px;font-weight:800;color:#6B7280;margin:4px 2px 0 6px;flex-basis:auto}
+  .cd-chip{padding:8px 13px;border-radius:12px;background:#F1F2F5;font-weight:700;font-size:14px;color:#4B5563}
+  .cd-chip.on{background:var(--blue);color:#fff}
+  .cd-h{font-size:18px;font-weight:900;margin:4px 0 12px}
+  .cd-grp{margin-bottom:14px}
+  .cd-gh{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:11px;font-size:14px}
+  .cd-it{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:10px 4px;border-bottom:1px solid var(--line)}
+  .cd-nm{font-weight:800;font-size:15px}
+  .cd-tx{font-weight:700;font-size:14px;text-align:right;color:#1F2937;min-width:0}
+  .cd-tx small{display:block;font-size:12px;font-weight:600;color:#6B7280;margin-top:2px}
+  .cd-mrow{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .cd-mo{width:92px;flex:none;font-weight:900;font-size:15px}
+  .cd-mrow .cx{align-items:flex-start;text-align:left;flex:1;padding:8px 10px}
+  .cd-sec{margin-bottom:16px}
+  .cd-card-h{font-weight:900;font-size:15px;padding:8px 12px;border-radius:10px;background:#F6F4EF;margin-bottom:4px}
+  .cd-etc ul{margin:6px 0 0;padding-left:18px}
+  .cd-etc{margin-top:12px;padding:12px;border-radius:12px;background:#FFF7ED;font-size:13.5px;color:#92400E;line-height:1.5}
+  .cd-legend{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .cd-gridwrap{overflow:auto;max-height:78vh;border:1px solid var(--line);border-radius:12px}
+  .cd-grid{border-collapse:separate;border-spacing:0;font-size:12px;min-width:1500px;width:100%}
+  .cd-grid th,.cd-grid td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:4px;vertical-align:middle;text-align:center;background:#fff}
+  .cd-grid thead th{position:sticky;top:0;background:#F6F4EF;z-index:2;font-weight:800}
+  .cd-grid thead tr:nth-child(2) th{top:29px;font-size:11px;font-weight:700}
+  .cd-grid .cd-mc{position:sticky;left:0;background:#F6F4EF;z-index:3;min-width:72px;font-weight:900}
+  .cd-grid td .cx{display:flex;width:100%;min-width:76px;padding:5px 4px;border-radius:7px;font-size:11.5px}
+  .cd-etc-td{font-size:11px;color:#92400E;text-align:left!important;min-width:90px;vertical-align:top!important}
+  @media (max-width:760px){ .cd-mo{width:84px;font-size:14px} }
+  @media print{
+    body *{visibility:hidden}
+    #proposalPaper,#proposalPaper *{visibility:visible}
+    #proposalPaper{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:none}
+    @page{margin:12mm}
+  }
+
+</style>
+</head>
+<body>
+
+<header class="topnav">
+  <nav class="navwrap">
+    <span style="font-weight:900;font-size:17px;padding:6px 4px">🧮 구독 견적 계산기</span>
+  </nav>
+</header>
+
+<main>
+  <section id="view-quote" class="view"><div id="quoteRoot"></div>
+    <div class="muted" style="text-align:center;margin:22px 0 96px;font-size:12px;line-height:1.6">제휴카드·Hi 구독플러스 혜택 기준: 2026년 11월<br>실제 적용 조건은 계약 시 확정됩니다</div></section>
+  <section id="view-proposal" class="view" hidden><div id="proposalRoot"></div></section>
+</main>
+
+<div class="floatbar" id="floatBar" hidden>
+  <div><div class="fl" id="floatLabel">예상 월 체감가</div><div class="fv" id="floatValue">월 0원</div></div>
+  <button class="btn red" data-act="toProposal">제안서 보기 →</button>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   유틸
+===================================================================== */
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const digits = v => Number(String(v==null?'':v).replace(/[^\d]/g,'')) || 0;
+const n2 = v => Math.round(Number(v)||0).toLocaleString('ko-KR');
+const pad2 = v => String(v).padStart(2,'0');
+const clone = o => JSON.parse(JSON.stringify(o));
+function lsGet(k, fb){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; }catch(e){ return fb; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ t.hidden = true; }, 3200);
+}
+
+
+/* =====================================================================
+   혜택 기준값 (매월 이 부분만 수정하면 전 직원 화면에 동일하게 반영됩니다)
+   - 제휴카드: 이용금액 구간별 월 캐시백 / 구독플러스: off=60개월 기준 월 지원금(총 지원금÷60), pay=월 납입금
+===================================================================== */
+const CONFIG = {
+  cards: [
+    { name:'롯데카드', tiers:[{spend:'30만원',off:18000},{spend:'70만원',off:20000},{spend:'150만원',off:22000}] },
+    { name:'우리카드', tiers:[{spend:'30만원',off:18000},{spend:'70만원',off:20000},{spend:'120만원',off:22000}] },
+    { name:'삼성카드', tiers:[{spend:'30만원',off:13000},{spend:'70만원',off:17000},{spend:'150만원',off:20000}] },
+    { name:'신한카드', tiers:[{spend:'50만원',off:10000},{spend:'100만원',off:20000},{spend:'200만원',off:30000}] }
+  ],
+  freed: {
+    plans: [ {name:'플러스 72',off:12000,pay:40000}, {name:'플러스 90',off:15000,pay:50000}, {name:'플러스 108',off:18000,pay:60000} ],
+    maxSlots: 8
+  }
+};
+const settings = CONFIG;
+
+
+// ==PURE_START==
+function newItem(){ return { name:'', model:'', months:36, fee:0, care:'' }; }
+function newQuote(){
+  return { items:[newItem()], card:{ name:'', tier:-1, off:0 }, freed:{ counts:[0,0,0,0,0,0] }, extras:[] };
+}
+
+// 구독프리드: 설정의 off는 60개월 기준 월 지원금 → 총 지원금(예: 플러스 72 = 72만원)을 구독개월수로 나눠 월 지원금 산출
+const FREED_PAY_TIMES = 90, FREED_TOTAL_TIMES = 120;   // 월 납입 1~90회, 91~120회는 0원 (브로셔 기준)
+function freedPay(p){ return Number(p.pay) || 0; }
+function freedPrice(p){ return freedPay(p) * FREED_PAY_TIMES; }
+function manwon(v){ return v % 10000 === 0 ? n2(v / 10000) + '만원' : n2(v) + '원'; }
+function freedTotal(p){ return (Number(p.off)||0) * 60; }
+function freedUnit(p, months){ const m = Number(months)||60; return Math.round(freedTotal(p) / m); }
+function quoteMonths(q){ let ms = q.items.filter(it => (Number(it.fee)||0) > 0 || String(it.name||'').trim()).map(it => Number(it.months)||60); if(!ms.length) ms = q.items.map(it => Number(it.months)||60); return ms.length ? Math.max.apply(null, ms) : 60; }
+function eqLines(monthly, months, sub, extra, total, mixed, periodLabel){
+  const L = [mixed ? `${periodLabel} 구독 합계 ${n2(sub)}원` : `월 ${n2(monthly)}원 × ${months}개월 = ${n2(sub)}원`];
+  if(extra > 0){ L.push(`− 추가행사 캐시백 ${n2(extra)}원`); L.push(`체감 제품가격 ${n2(total)}원`); }
+  return L;
+}
+function mulText(a, n, t){ return `월 ${n2(a)}원 × ${n}개월 ${a * n === t ? '=' : '≒'} ${n2(t)}원`; }
+function calcQuote(q, st){
+  const items = q.items.filter(it => (Number(it.fee)||0) > 0 || String(it.name||'').trim());
+  const baseMonthly = items.reduce((s,it)=> s + (Number(it.fee)||0), 0);
+  const cardOff = Math.max(0, Number(q.card.off)||0);
+  const plans = st.freed.plans;
+  const fm = quoteMonths(q);
+  const freedOff = plans.reduce((s,p,i)=> s + freedUnit(p, fm) * (Number(q.freed.counts[i])||0), 0);
+  const slots = plans.reduce((s,p,i)=> s + (Number(q.freed.counts[i])||0), 0);
+  const freedMaturity = plans.reduce((s,p,i)=> s + freedPrice(p) * (Number(q.freed.counts[i])||0), 0);
+  const extraOff = q.extras.reduce((s,e)=> s + Math.max(0, Number(e.off)||0), 0);
+  const totalOff = cardOff + freedOff + extraOff;
+  const monthsList = items.length ? items.map(it => Number(it.months)||60) : q.items.map(it => Number(it.months)||60);
+  const maxMonths = monthsList.length ? Math.max.apply(null, monthsList) : 60;
+  const minMonths = monthsList.length ? Math.min.apply(null, monthsList) : 60;
+  const mixed = minMonths !== maxMonths;
+  const principal = items.reduce((s,it)=> s + (Number(it.fee)||0) * (Number(it.months)||60), 0);
+  const monthlyOff = cardOff + freedOff;                       // 매월 적용되는 혜택(카드·구독플러스)
+  const monthly = baseMonthly - monthlyOff;                 // 월 체감가 (마이너스면 돌려받는 구조)
+  const subTotal = principal - monthlyOff * maxMonths;      // 월 체감가 × 개월수로 도출된 금액
+  const total = subTotal - extraOff;                        // 추가행사 캐시백은 여기서 차감 → 최종 체감 제품가격
+  return { items, baseMonthly, cardOff, freedOff, slots, freedMaturity, extraOff, totalOff, monthly,
+           maxMonths, minMonths, mixed, principal, subTotal, total, refund: monthly < 0 && baseMonthly > 0, refundTotal: total < 0 ? -total : 0 };
+}
+
+/* 상태 */
+let quotes = [newQuote()];
+let qi = 0;
+
+/* 라우팅 */
+const VIEWS = ['quote','proposal'];
+function go(v){
+  if(VIEWS.indexOf(v) < 0) v = 'quote';
+  if(location.hash !== '#' + v) location.hash = v; else showView(v);
+}
+window.addEventListener('hashchange', () => showView(location.hash.slice(1)));
+function showView(v){
+  if(VIEWS.indexOf(v) < 0) v = 'quote';
+  VIEWS.forEach(n => { $('#view-' + n).hidden = n !== v; });
+  $('#floatBar').hidden = v !== 'quote';
+  if(v === 'quote') renderQuote();
+  if(v === 'proposal') renderProposal();
+  window.scrollTo(0, 0);
+}
+
+/* =====================================================================
+   견적 화면
+===================================================================== */
+function contractText(it){
+  const f = Number(it.fee)||0, m = Number(it.months)||36;
+  return f > 0 ? `계약금액 ${n2(f * m)}원 (${m}개월)` : '월 요금을 입력하면 계약금액이 자동 계산돼요';
+}
+function itemsHTML(q){
+  return q.items.map((it,i) => `
+   <div class="item">
+     <div class="item-row">
+       <span class="item-no">구독 ${i+1}</span>
+       <div class="seg small">
+         <button class="segbtn ${it.months===36?'on':''}" data-act="months" data-i="${i}" data-v="36">36개월</button>
+         <button class="segbtn ${it.months===60?'on red':''}" data-act="months" data-i="${i}" data-v="60">60개월</button>
+       </div>
+       <div class="money"><input class="in fee-in" inputmode="numeric" placeholder="월 요금" data-f="fee" data-i="${i}" value="${it.fee?esc(it.fee):''}"><span>원</span></div>
+     </div>
+     <div class="contract" id="ct${i}">${contractText(it)}</div>
+     <div class="item-row sub">
+       <span class="chip red">🛡 5년 무상 A/S 기본 포함</span>
+       ${q.items.length>1 ? `<button class="icon-btn" data-act="delItem" data-i="${i}" aria-label="품목 삭제">✕</button>` : ''}
+     </div>
+   </div>`).join('');
+}
+function renderItemsBox(){ const b = $('#itemsBox'); if(b) b.innerHTML = itemsHTML(quotes[qi]); }
+
+// 60개월 구독은 롯데제휴카드만 가능 (36개월은 롯데·우리·신한·삼성 제휴카드)
+function card60Ok(name){ return String(name || '').indexOf('롯데') >= 0; }
+function needs60(q){ return quoteMonths(q) >= 48; }
+function enforceCard60(){
+  let reset = false;
+  quotes.forEach(q => { if(needs60(q) && q.card.name && !card60Ok(q.card.name)){ q.card.name = ''; q.card.off = 0; q.card.tier = -1; reset = true; } });
+  if(reset) toast('60개월 구독은 롯데제휴카드만 가능해서 카드 선택을 해제했어요');
+}
+function cardSectionHTML(q){
+  const cfg = settings.cards.find(c => c.name === q.card.name);
+  return `<div class="card">
+    <div class="sec-head"><h2>3. 제휴카드 및 월 사용금액 구간</h2></div>
+    <div class="flexwrap">
+      ${settings.cards.map(cd => { const off = needs60(q) && !card60Ok(cd.name); return `<button class="pill ${q.card.name===cd.name?'on':''}${off?' dis':''}" data-act="card" data-v="${esc(cd.name)}" ${off?'disabled aria-disabled="true"':''}>${esc(cd.name)}</button>`; }).join('')}
+      <button class="pill ${!q.card.name?'on':''}" data-act="card" data-v="">미적용</button>
+    </div>
+    ${needs60(q) ? '<div class="warn" style="margin-top:10px">60개월 구독은 현재 <b>롯데제휴카드만</b> 가능해요. (36개월은 롯데·우리·신한·삼성 제휴카드 가능)</div>' : ''}
+    ${cfg ? `<div class="grid3 keep" style="margin-top:12px">
+      ${cfg.tiers.map((t,i)=>`<button class="tier ${q.card.tier===i?'on':''}" data-act="tier" data-i="${i}"><span>${esc(t.spend)}</span><b>${Number(t.off)>0 ? '-' + n2(t.off) + '원' : '미설정'}</b></button>`).join('')}
+    </div>` : ''}
+    ${q.card.name ? `<label class="field inline">월 캐시백 직접 입력
+      <div class="money"><input class="in" inputmode="numeric" data-f="cardOff" value="${q.card.off?esc(q.card.off):''}"><span>원</span></div></label>` : ''}
+  </div>`;
+}
+function freedSectionHTML(q, c){
+  const plans = settings.freed.plans; const max = settings.freed.maxSlots;
+  return `<div class="card">
+    <div class="sec-head"><h2>2. Hi 구독플러스(적립형 결합상품)</h2>
+      <div class="row-gap"><span class="chip blue">총 ${c.slots}구좌 / 최대 ${max}구좌 (월 -${n2(c.freedOff)}원)${c.slots>0 ? ' · 만기 원금 합계 ' + manwon(c.freedMaturity) : ''}</span>
+      <button class="btn ghost" data-act="freedReset">↺ 미적용(초기화)</button></div></div>
+    <div class="grid3 keep">
+      ${plans.map((p,i) => { const cnt = Number(q.freed.counts[i])||0; return `
+        <div class="plan ${cnt>0?'on':''}"><b>${esc(p.name)}</b><span class="red-t">월 -${n2(freedUnit(p, c.maxMonths))}원 지원</span><small class="ctr pt">총 ${freedTotal(p)%10000===0 ? n2(freedTotal(p)/10000)+'만원' : n2(freedTotal(p))+'원'}<br>÷ ${c.maxMonths}개월</small>${freedPay(p) > 0 ? `<small class="ctr pt" style="color:#4B5563">${cnt>0 ? cnt : 1}구좌 월 ${n2(freedPay(p)*Math.max(cnt,1))}원 ${FREED_PAY_TIMES}회 납입<br>${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치 후</small><span class="mat ${cnt>0?'':'off'}">만기 원금 ${manwon(freedPrice(p)*Math.max(cnt,1))}</span>` : ''}
+          <div class="stepper"><button class="step" data-act="freedDec" data-i="${i}" ${cnt<=0?'disabled':''} aria-label="줄이기">−</button><span>${cnt}개</span>
+          <button class="step plus" data-act="freedInc" data-i="${i}" ${c.slots>=max?'disabled':''} aria-label="늘리기">＋</button></div></div>`; }).join('')}
+    </div></div>`;
+}
+function extraSectionHTML(q){
+  return `<div class="card">
+    <div class="sec-head"><h2>4. 추가행사</h2><button class="btn soft" data-act="addExtra">＋ 캐시백 추가</button></div>
+    ${q.extras.map((e,i) => `
+      <div class="item-row">
+        <span class="item-no">캐시백</span>
+        <div class="money"><input class="in" inputmode="numeric" placeholder="캐시백 금액" data-f="extraOff" data-i="${i}" value="${e.off?esc(e.off):''}"><span>원</span></div>
+        <button class="icon-btn" data-act="delExtra" data-i="${i}" aria-label="삭제">✕</button>
+      </div>`).join('')}
+    <div class="muted" style="margin-top:6px">캐시백 금액을 입력하면 최종 혜택가에 반영돼 체감 제품가격이 그만큼 낮아져요.</div>
+  </div>`;
+}
+
+function renderQuote(){
+  enforceCard60();
+  if(!quotes[qi].extras.length) quotes[qi].extras.push({ label:'', off:0 });
+  const q = quotes[qi]; const c = calcQuote(q, settings);
+  $('#quoteRoot').innerHTML = `
+  <div class="qhead"><div class="qtitle">구독 구매 견적서</div></div>
+
+  <div class="card">
+    <div class="sec-head"><h2>1. 구독 품목 및 월요금</h2>
+      <div class="row-gap">
+        <button class="btn primary" data-act="addItem">＋ 품목 추가</button>
+        <button class="btn ghost" data-act="resetQuote">↺ 초기화</button>
+      </div></div>
+    <div id="itemsBox">${itemsHTML(q)}</div>
+    <div class="sum-line"><span class="l" id="periodNote"></span><span id="baseTotal"></span></div>
+  </div>
+
+  ${freedSectionHTML(q, c)}
+  ${cardSectionHTML(q)}
+  ${extraSectionHTML(q)}
+
+  <div class="card">
+    <div class="result" id="resultBox"></div>
+    <div style="margin-top:14px"><button class="btn red block" data-act="toProposal">✓ 확인 (고객 맞춤 제안서 보기) →</button></div>
+  </div>`;
+  updateSummary();
+}
+
+function updateSummary(){
+  const q = quotes[qi]; const c = calcQuote(q, settings);
+  q.items.forEach((it,i) => { const el = $('#ct' + i); if(el) el.textContent = contractText(it); });
+  const pn = $('#periodNote');
+  if(pn){
+    if(!c.items.length) pn.textContent = '품목과 월 요금을 입력하세요';
+    else {
+      const allSixty = true;
+      pn.textContent = `✓ 구독기간: ${c.mixed ? c.minMonths + '~' + c.maxMonths : c.maxMonths}개월 (원금 합계 ${n2(c.principal)}원${allSixty ? ' · 전 품목 5년 무상 A/S 기본 보장' : ''})`;
+    }
+    $('#baseTotal').textContent = `총 월 구독료 합계: ${n2(c.baseMonthly)}원`;
+  }
+  const rb = $('#resultBox');
+  if(rb){
+    rb.innerHTML = `<div>
+      <div class="r-title">실시간 예상 최종 월 체감가 (${c.maxMonths}개월)</div>
+      <div class="r-calc">${eqLines(c.monthly, c.maxMonths, c.subTotal, c.extraOff, c.total, c.mixed, c.minMonths + '~' + c.maxMonths + '개월').map((t,k,arr) => k === arr.length-1 ? '<b>' + t + '</b>' : t).join('<br>')}</div>
+      <div class="r-sub">기본 ${n2(c.baseMonthly)} − 구독플러스 ${n2(c.freedOff)} − 카드 ${n2(c.cardOff)}</div>
+      ${c.refund ? `<div class="warn ok">💰 할인 합계가 월 구독료보다 커서 매월 ${n2(-c.monthly)}원을 오히려 돌려받는 구조예요.<br><b>총 환급액 ${n2(c.refundTotal)}원</b> (월 ${n2(-c.monthly)}원 × ${c.maxMonths}개월${c.extraOff>0 ? ' + 캐시백 ' + n2(c.extraOff) + '원' : ''})</div>` : ''}
+      ${c.mixed ? '<div class="warn">기간이 다른 품목이 섞여 있어요. 할인은 가장 긴 기간 기준으로 계산했어요.</div>' : ''}
+    </div><div class="r-big ${c.refund ? 'neg' : ''}">월 ${n2(c.monthly)}원</div>`;
+  }
+  const fv = $('#floatValue'); if(fv) fv.textContent = `월 ${n2(c.monthly)}원`;
+  const fl = $('#floatLabel'); if(fl) fl.textContent = '예상 월 체감가';
+}
+/* =====================================================================
+   제안서
+===================================================================== */
+function proposalModel(q, c){
+  const title = '구독 상품';
+  const periodLabel = c.mixed ? `${c.minMonths}~${c.maxMonths}개월` : `${c.maxMonths}개월`;
+  const items = c.items.map((it,k) => ({
+    name: String(it.name || '').trim() || ('구독 상품' + (c.items.length > 1 ? ' ' + (k+1) : '')), model: String(it.model || '').trim(), months: Number(it.months)||60,
+    fee: Number(it.fee)||0, contract: (Number(it.fee)||0) * (Number(it.months)||60),
+    care: '5년 무상 A/S 보장'
+  }));
+  const lines = [];
+  if(c.freedOff > 0){
+    const parts = settings.freed.plans.map((p,i) => (Number(q.freed.counts[i])||0) > 0 ? `${p.name} ${q.freed.counts[i]}구좌` : '').filter(Boolean).join(', ');
+    lines.push({ kind:'freed', label:'(-) Hi 구독플러스(적립형 결합상품) 월 지원금', sub:`${parts} · 총 ${manwon(c.freedOff*c.maxMonths)} ÷ ${c.maxMonths}개월`, amount:c.freedOff, total:c.freedOff*c.maxMonths,
+      info: settings.freed.plans.map((p,i) => { const n = Number(q.freed.counts[i])||0; return n > 0 && freedPay(p) > 0 ? `${p.name} ${n}구좌: 월 ${n2(freedPay(p)*n)}원 ${FREED_PAY_TIMES}회 납입 → ${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치(${FREED_PAY_TIMES+1}~${FREED_TOTAL_TIMES}회) → 만기 시 원금 ${manwon(freedPrice(p)*n)}` : ''; }).filter(Boolean).concat(c.slots > 1 ? ['만기 원금 합계 ' + manwon(c.freedMaturity)] : []).join(' / ') });
+  }
+  if(c.cardOff > 0){
+    const cfg = settings.cards.find(cd => cd.name === q.card.name);
+    const tier = cfg && q.card.tier >= 0 ? cfg.tiers[q.card.tier] : null;
+    lines.push({ kind:'card', label:`(-) 제휴카드 월 캐시백${q.card.name ? ` (${q.card.name})` : ''}`,
+      sub:`${tier && tier.spend ? `전월 실적 ${tier.spend} 이상 · ` : ''}${c.maxMonths}개월간 매월 캐시백`, amount:c.cardOff, total:c.cardOff*c.maxMonths });
+  }
+  q.extras.forEach(e => { const a = digits(e.off); if(a > 0) lines.push({ kind:'extra', lump:true, label:'(-) 추가행사 캐시백', sub:'월 체감가 × 개월수 금액에서 차감 → 체감 제품가격에 반영', amount:a, total:a }); });
+  const chipParts = ['월 구독료'].concat(lines.map(l => l.kind === 'card' ? '카드캐시백' : l.kind === 'freed' ? 'Hi 구독플러스' : l.kind === 'extra' ? '추가행사 캐시백' : l.label.replace('(-) ','')));
+  const d = new Date();
+  return {
+    empty: !items.length, title, periodLabel, items, lines, chip: chipParts.join(' — '),
+    base: c.baseMonthly, monthly: c.monthly, total: c.total, principal: c.principal, months: c.maxMonths,
+    allSixty: true, refund: c.refund, refundTotal: c.refundTotal, mixed: c.mixed, sub: c.subTotal, extra: c.extraOff, eq: eqLines(c.monthly, c.maxMonths, c.subTotal, c.extraOff, c.total, c.mixed, periodLabel),
+    dateStr: `${d.getFullYear()}.${pad2(d.getMonth()+1)}.${pad2(d.getDate())}`
+  };
+}
+
+function renderProposal(){
+  enforceCard60();
+  const q = quotes[qi]; const c = calcQuote(q, settings); const m = proposalModel(q, c);
+  const tools = `
+  <div class="ptool">
+    <button class="btn ghost" data-go="quote">← 조건 수정</button>
+    <div class="row-gap"><button class="btn soft" data-act="copyText">텍스트 복사</button><button class="btn primary" data-act="saveImage">이미지 저장</button><button class="btn dark" data-act="print">인쇄</button></div>
+  </div>`;
+  if(m.empty){
+    $('#proposalRoot').innerHTML = tools + `<div class="card"><h2>입력된 품목이 없어요</h2><p class="muted">‘조건 수정’에서 품목과 월 요금을 입력해주세요.</p></div>`;
+    return;
+  }
+  $('#proposalRoot').innerHTML = tools + `
+  <div class="paper" id="proposalPaper">
+    <div class="p-head">
+      <div><span class="tag">맞춤 구독 설계안</span><h1>구독 제안서 (${esc(m.periodLabel)} 구독)</h1></div>
+      <div class="badge">5년 무상 A/S 보장</div>
+    </div>
+    <div class="p-box">
+      ${m.items.map(it => `<div class="p-item">
+        <div><div class="nm">${esc(it.name)}</div><div class="meta">${esc([it.model, it.months + '개월 구독', it.care].filter(Boolean).join(' · '))}</div></div>
+        <div class="fee">월 ${n2(it.fee)}원<small class="ctr">계약금액 ${n2(it.contract)}원 (${it.months}개월)</small></div></div>`).join('')}
+      ${m.items.length > 1 ? `<div class="p-total"><span>총 월 구독료 합계</span><span>월 ${n2(m.base)}원</span></div>` : ''}
+    </div>
+    ${m.lines.map(l => `<div class="p-line"><div><div class="lb">${esc(l.label)}</div><div class="sb">${esc(l.sub)}</div>${l.info ? `<div class="sb inf">${esc(l.info).split(' / ').join('<br>')}</div>` : ''}</div><div class="am">${l.lump ? '' : '월 '}-${n2(l.amount)}원<small class="ctr">${l.lump ? '캐시백 (최종 혜택가 반영)' : m.months + '개월 혜택 합계 ' + n2(l.total) + '원'}</small></div></div>`).join('')}
+    <div class="p-final ${m.refund ? 'refund' : ''}">
+      <span class="ch">${esc(m.chip)}</span>
+      <div class="t">${m.refund ? '💰' : '🎯'} 최종 월 체감가 (${esc(m.periodLabel)} 구독)</div>
+      <div class="big">월 ${n2(m.monthly)}원</div>
+      <div class="calc">${m.eq.map((t,k,arr) => k === arr.length-1 ? '<b>' + esc(t) + '</b>' : esc(t)).join('<br>')}</div>
+      ${m.refund ? `<div class="rf">매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요</div><div class="rf2">총 환급액 <b>${n2(m.refundTotal)}원</b><small>(월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})</small></div>` : ''}
+    </div>
+    <div class="p-sum"><span style="font-weight:800">최종 ${esc(m.periodLabel)} 체감 제품가격${m.total < 0 ? ' (총 환급)' : ''}</span><span><b>${n2(m.total)}원</b><small>(원금 ${n2(m.principal)}원)</small></span></div>
+    <div class="p-foot">작성일 ${esc(m.dateStr)} · 실제 적용 조건은 계약 시 확정됩니다</div>
+  </div>`;
+}
+
+function quoteText(){
+  const q = quotes[qi]; const c = calcQuote(q, settings); const m = proposalModel(q, c);
+  const L = ['[구독 견적]'];
+  m.items.forEach(it => L.push(`${it.name}${it.model ? ' (' + it.model + ')' : ''} · ${it.months}개월 · 월 ${n2(it.fee)}원 (계약금액 ${n2(it.contract)}원)`));
+  if(m.items.length > 1) L.push(`총 월 구독료 합계: ${n2(m.base)}원`);
+  m.lines.forEach(l => { L.push(l.lump ? `${l.label}: -${n2(l.amount)}원 (최종 혜택가 반영)` : `${l.label}: -${n2(l.amount)}원 (${m.months}개월 합계 ${n2(l.total)}원)`); if(l.info) L.push('   · ' + l.info); });
+  L.push(`▶ 최종 월 체감가: ${n2(m.monthly)}원${m.refund ? ' (매월 ' + n2(-m.monthly) + '원 환급)' : ''}`);
+  m.eq.forEach(t => L.push('   · ' + t));
+  if(m.refund) L.push(`▶ 총 환급액: ${n2(m.refundTotal)}원 (월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})`);
+  L.push(`▶ ${m.periodLabel} 체감 제품가격: ${n2(m.total)}원${m.refund ? ' (총 환급)' : ''} (원금 ${n2(m.principal)}원)`);
+  return L.join('\n');
+}
+async function copyText(){
+  const q = quotes[qi]; if(!calcQuote(q, settings).items.length){ toast('먼저 견적을 입력해주세요'); return; }
+  const text = quoteText();
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); }
+    else throw new Error('no clipboard');
+    toast('견적 내용을 복사했어요. 카톡·문자에 붙여넣기 하세요');
+  }catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try{ ok = document.execCommand('copy'); }catch(_){}
+    ta.remove(); toast(ok ? '견적 내용을 복사했어요' : '복사에 실패했어요. 직접 선택해서 복사해주세요');
+  }
+}
+
+/* ---- 이미지 저장 (캔버스로 직접 그림, 외부 라이브러리 없음) ---- */
+function rr(ctx, x, y, w, h, r){
+  ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath();
+}
+function fitText(ctx, text, maxW){
+  let t = String(text); if(ctx.measureText(t).width <= maxW) return t;
+  while(t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+  return t + '…';
+}
+async function saveImage(){
+  const q = quotes[qi]; const c = calcQuote(q, settings);
+  if(!c.items.length){ toast('먼저 견적을 입력해주세요'); return; }
+  const m = proposalModel(q, c);
+  try{ if(document.fonts && document.fonts.ready) await document.fonts.ready; }catch(_){}
+  const W = 1080, P = 40, IW = W - P*2;
+  const FONT = "'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif";
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = 4200;
+  const x = cv.getContext('2d'); x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.fillStyle = '#F3F4F8'; x.fillRect(0, 0, W, 4200);
+  let y = P;
+
+  rr(x, P, y, IW, 160, 30); x.fillStyle = '#111827'; x.fill();
+  x.font = `700 24px ${FONT}`; x.fillStyle = '#FDA4AF'; x.fillText('맞춤 구독 설계안', P+36, y+52);
+  x.font = `900 46px ${FONT}`; x.fillStyle = '#FFFFFF';
+  x.fillText(fitText(x, `구독 제안서 (${m.periodLabel} 구독)`, IW-72), P+36, y+116);
+  y += 160 + 24;
+
+  const n = m.items.length, rowH = 108, itemsH = 24 + n*rowH + (n > 1 ? 70 : 0) + 8;
+  rr(x, P, y, IW, itemsH, 26); x.fillStyle = '#FFFFFF'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#E5E7EB'; x.stroke();
+  let ry = y + 24;
+  m.items.forEach(it => {
+    x.textAlign = 'left'; x.font = `900 40px ${FONT}`; x.fillStyle = '#111827';
+    x.fillText(fitText(x, it.name, 540), P+32, ry+46);
+    x.font = `500 24px ${FONT}`; x.fillStyle = '#6B7280';
+    const meta = [it.model, it.months + '개월 구독', it.care].filter(Boolean).join(' · ');
+    x.fillText(fitText(x, meta, 470), P+32, ry+84);
+    x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#111827';
+    x.fillText(`월 ${n2(it.fee)}원`, W-P-32, ry+50);
+    x.font = `600 20px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`계약금액 ${n2(it.contract)}원 (${it.months}개월)`, W-P-32, ry+86);
+    ry += rowH;
+  });
+  if(n > 1){
+    x.textAlign = 'left'; x.strokeStyle = '#E5E7EB'; x.lineWidth = 2; x.beginPath(); x.moveTo(P+32, ry); x.lineTo(W-P-32, ry); x.stroke();
+    x.font = `800 26px ${FONT}`; x.fillStyle = '#D81B45'; x.fillText('총 월 구독료 합계', P+32, ry+44);
+    x.textAlign = 'right'; x.fillText(`월 ${n2(m.base)}원`, W-P-32, ry+44);
+  }
+  x.textAlign = 'left';
+  y += itemsH + 20;
+
+  m.lines.forEach(l => {
+    const infoLines = l.info ? l.info.split(' / ') : [];
+    const h = 112 + infoLines.length * 34;
+    rr(x, P, y, IW, h, 24); x.fillStyle = '#EFF4FF'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#DBE5FF'; x.stroke();
+    x.textAlign = 'left'; x.font = `800 30px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, l.label, 640), P+32, y+46);
+    x.font = `500 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(fitText(x, l.sub, 640), P+32, y+84);
+    infoLines.forEach((ln, k) => { x.textAlign = 'left'; x.font = `700 20px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, ln, IW-72), P+32, y+126+k*32); });
+    x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#2F5BFF'; x.fillText(`${l.lump ? '' : '월 '}-${n2(l.amount)}원`, W-P-32, y+56);
+    x.font = `600 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(l.lump ? '캐시백 (최종 혜택가 반영)' : `${m.months}개월 혜택 합계 ${n2(l.total)}원`, W-P-32, y+90);
+    y += h + 16;
+  });
+  x.textAlign = 'left';
+
+  y += 8; const sh = (m.eq.length - 1) * 44; const fh = (m.refund ? 500 : 340) + sh;
+  rr(x, P, y, IW, fh, 30); x.fillStyle = m.refund ? '#ECFDF5' : '#FEF2F4'; x.fill(); x.lineWidth = 3; x.strokeStyle = m.refund ? '#34D399' : '#FB7185'; x.stroke();
+  x.textAlign = 'center';
+  x.font = `500 24px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(fitText(x, m.chip, IW-80), W/2, y+62);
+  x.font = `800 30px ${FONT}`; x.fillStyle = m.refund ? '#047857' : '#BE123C'; x.fillText(`최종 월 체감가 (${m.periodLabel} 구독)`, W/2, y+112);
+  x.font = `900 112px ${FONT}`; x.fillStyle = m.refund ? '#059669' : '#E11D48'; x.fillText(`월 ${n2(m.monthly)}원`, W/2, y+236);
+  x.font = `700 30px ${FONT}`; x.fillStyle = '#4B5563'; m.eq.forEach((t, k) => { x.font = (k === m.eq.length - 1 && m.eq.length > 1 ? '900' : '700') + ` 30px ${FONT}`; x.fillText(t, W/2, y+290+k*44); });
+  if(m.refund){ x.font = `800 32px ${FONT}`; x.fillStyle = '#047857'; x.fillText(`💰 매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요`, W/2, y+356+sh);
+    x.font = `900 46px ${FONT}`; x.fillStyle = '#065F46'; x.fillText(`총 환급액 ${n2(m.refundTotal)}원`, W/2, y+424+sh);
+    x.font = `600 24px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`(월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})`, W/2, y+464+sh); }
+  x.textAlign = 'left';
+  y += fh + 20;
+
+  rr(x, P, y, IW, 112, 26); x.fillStyle = '#111827'; x.fill();
+  x.font = `700 30px ${FONT}`; x.fillStyle = '#FFFFFF'; x.fillText(`최종 ${m.periodLabel} 체감 제품가격${m.total < 0 ? ' (총 환급)' : ''}`, P+32, y+68);
+  x.textAlign = 'right'; x.font = `500 24px ${FONT}`; x.fillStyle = '#9CA3AF';
+  const sub = `(원금 ${n2(m.principal)}원)`; x.fillText(sub, W-P-32, y+66);
+  const sw = x.measureText(sub).width;
+  x.font = `900 44px ${FONT}`; x.fillStyle = '#FFFFFF'; x.fillText(`${n2(m.total)}원`, W-P-32-sw-14, y+70);
+  x.textAlign = 'left';
+  y += 112 + 34;
+
+  x.textAlign = 'center'; x.font = `400 22px ${FONT}`; x.fillStyle = '#9CA3AF';
+  x.fillText(`작성일 ${m.dateStr} · 실제 적용 조건은 계약 시 확정됩니다`, W/2, y+8);
+  y += 28 + P;
+
+  const out = document.createElement('canvas'); out.width = W; out.height = Math.min(y, 4200);
+  out.getContext('2d').drawImage(cv, 0, 0, W, out.height, 0, 0, W, out.height);
+  out.toBlob(blob => {
+    if(!blob){ toast('이미지를 만들지 못했어요'); return; }
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = `구독제안서_${m.dateStr.replace(/\./g,'')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast('이미지를 저장했어요');
+  }, 'image/png');
+}
+
+/* =====================================================================
+   이벤트
+===================================================================== */
+document.addEventListener('click', async e => {
+  const g = e.target.closest('[data-go]');
+  if(g){ go(g.dataset.go); return; }
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const act = el.dataset.act; const i = Number(el.dataset.i); const q = quotes[qi];
+  switch(act){
+    case 'months': q.items[i].months = Number(el.dataset.v) === 36 ? 36 : 60; renderQuote(); break;
+    case 'addItem': q.items.push(newItem()); renderQuote(); break;
+    case 'delItem': q.items.splice(i, 1); if(!q.items.length) q.items.push(newItem()); renderQuote(); break;
+    case 'resetQuote': if(confirm('입력한 내용을 모두 지울까요?')){ quotes[qi] = newQuote(); renderQuote(); } break;
+    case 'card': {
+      const nm = el.dataset.v;
+      if(nm && needs60(q) && !card60Ok(nm)){ toast('60개월 구독은 롯데제휴카드만 가능해요'); break; }
+      q.card.name = nm;
+      if(!nm){ q.card.off = 0; q.card.tier = -1; }
+      else { const cfg = settings.cards.find(c => c.name === nm); const ti = cfg ? cfg.tiers.findIndex(t => Number(t.off) > 0) : -1; q.card.tier = ti; q.card.off = ti >= 0 ? Number(cfg.tiers[ti].off) : 0; }
+      renderQuote(); break;
+    }
+    case 'tier': {
+      const cfg = settings.cards.find(c => c.name === q.card.name); if(!cfg) break;
+      q.card.tier = i; q.card.off = Number(cfg.tiers[i].off) || 0;
+      renderQuote(); break;
+    }
+    case 'freedInc': { const c = calcQuote(q, settings); if(c.slots < settings.freed.maxSlots){ q.freed.counts[i] = (Number(q.freed.counts[i])||0) + 1; renderQuote(); } break; }
+    case 'freedDec': q.freed.counts[i] = Math.max(0, (Number(q.freed.counts[i])||0) - 1); renderQuote(); break;
+    case 'freedReset': q.freed.counts = [0,0,0,0,0,0]; renderQuote(); break;
+    case 'addExtra': q.extras.push({ label:'', off:0 }); renderQuote(); break;
+    case 'delExtra': q.extras.splice(i, 1); renderQuote(); break;
+    case 'toProposal': {
+      const c = calcQuote(q, settings);
+      if(!c.items.length || c.baseMonthly <= 0){ toast('월 요금을 먼저 입력해주세요'); break; }
+      go('proposal'); break;
+    }
+    case 'copyText': copyText(); break;
+    case 'saveImage': saveImage(); break;
+    case 'print': window.print(); break;
+  }
+});
+
+document.addEventListener('input', e => {
+  const t = e.target; const q = quotes[qi];
+  if(!t.dataset.f) return;
+  const i = Number(t.dataset.i);
+  switch(t.dataset.f){
+    case 'fee': q.items[i].fee = digits(t.value); break;
+    case 'cardOff': q.card.off = digits(t.value); q.card.tier = -1; $$('.tier').forEach(b => b.classList.remove('on')); break;
+    case 'extraOff': q.extras[i].off = digits(t.value); break;
+  }
+  updateSummary();
+});
+
+/* 시작 */
+if(location.hash && location.hash !== '#quote'){ try{ history.replaceState(null, '', location.pathname + location.search + '#quote'); }catch(_){ } }
+showView('quote');
+</script>
+</body>
+</html>
