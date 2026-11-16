@@ -66,6 +66,15 @@
   .grow{flex:1 1 160px}
   .money{display:flex;align-items:center;gap:6px;flex:0 1 190px;font-weight:700;color:var(--sub)}
   .money .in{text-align:right;font-weight:800}
+  .money .fee-in{font-size:22px;font-weight:900}
+  .contract{font-size:11px;font-weight:600;color:var(--sub);margin:2px 0 8px 2px}
+  .item-no{font-weight:800;color:var(--sub);font-size:14px}
+  .plan .mat{font-weight:900;color:#1E40AF;font-size:14px;text-align:center;word-break:keep-all}
+  .plan .mat.off{color:#9CA3AF}
+  .p-item .fee small.ctr{font-size:12px}
+  .p-final .calc{font-size:17px;font-weight:700;color:var(--sub);margin-top:8px}
+  .p-final .calc b{font-size:22px;color:var(--ink)}
+  .r-calc{font-size:15px;font-weight:700;margin-top:6px}
   .field{display:flex;flex-direction:column;gap:6px;margin-top:14px;font-weight:700;font-size:14px}
   .field.inline{flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap}
   .icon-btn{width:38px;height:38px;border-radius:12px;background:#F4F4F5;font-weight:800;color:#6B7280;flex:none}
@@ -380,8 +389,6 @@
 <div id="modalRoot"></div>
 <div id="toast" hidden></div>
 <datalist id="careList"></datalist>
-<input type="file" id="photoCam" accept="image/*" capture="environment" hidden>
-<input type="file" id="photoFile" accept="image/*" hidden>
 <input type="file" id="careFile" accept="image/*" hidden>
 
 <script>
@@ -422,8 +429,8 @@ const DEFAULT_SETTINGS = {
   apiKey: '',
   model: { claude: 'claude-sonnet-5-5', gemini: 'gemini-2.5-flash' },
   cards: [
-    { name:'우리카드', tiers:[{spend:'30만원',off:18000},{spend:'70만원',off:20000},{spend:'120만원',off:22000}] },
     { name:'롯데카드', tiers:[{spend:'30만원',off:18000},{spend:'70만원',off:20000},{spend:'150만원',off:22000}] },
+    { name:'우리카드', tiers:[{spend:'30만원',off:18000},{spend:'70만원',off:20000},{spend:'120만원',off:22000}] },
     { name:'삼성카드', tiers:[{spend:'30만원',off:13000},{spend:'70만원',off:17000},{spend:'150만원',off:20000}] },
     { name:'신한카드', tiers:[{spend:'50만원',off:10000},{spend:'100만원',off:20000},{spend:'200만원',off:30000}] }
   ],
@@ -434,13 +441,16 @@ const DEFAULT_SETTINGS = {
   careOptions: ['방문케어 (전문가 점검·교체)', '셀프케어', '케어 없음']
 };
 
+// 제휴카드 표시 순서: 롯데 → 우리 → 삼성 → 신한 (저장된 설정이 있어도 이 순서로 정렬, 금액은 그대로)
+const CARD_ORDER = ['롯데','우리','삼성','신한'];
+function orderCards(arr){ const rank = c => { const i = CARD_ORDER.findIndex(k => String((c && c.name) || '').indexOf(k) >= 0); return i < 0 ? 99 : i; }; return arr.map((c,i) => ({c,i})).sort((x,y) => rank(x.c) - rank(y.c) || x.i - y.i).map(o => o.c); }
 function loadSettings(){
   const saved = lsGet('hiw_settings_v1', {}) || {};
   const s = clone(DEFAULT_SETTINGS);
   if(saved.provider === 'gemini' || saved.provider === 'claude') s.provider = saved.provider;
   if(typeof saved.apiKey === 'string') s.apiKey = saved.apiKey;
   if(saved.model && typeof saved.model === 'object') s.model = Object.assign({}, s.model, saved.model);
-  if(Array.isArray(saved.cards) && saved.cards.length && saved.cardsVer === s.cardsVer) s.cards = saved.cards;
+  if(Array.isArray(saved.cards) && saved.cards.length && saved.cardsVer === s.cardsVer) s.cards = orderCards(saved.cards);
   if(saved.freed && Array.isArray(saved.freed.plans) && saved.freed.plans.length){
     s.freed.plans = saved.freed.plans;
     s.freed.plans.forEach((pl, k) => { if(!(Number(pl.pay) > 0)){ const d = DEFAULT_SETTINGS.freed.plans.find(x => x.name === pl.name) || DEFAULT_SETTINGS.freed.plans[k]; if(d) pl.pay = d.pay; } });
@@ -454,7 +464,7 @@ let settings = loadSettings();
    순수 로직 (계산 / AI 결과 해석 / 견적 반영)
 ===================================================================== */
 // ==PURE_START==
-function newItem(){ return { name:'', model:'', months:60, fee:0, care:'방문케어 (전문가 점검·교체)' }; }
+function newItem(){ return { name:'', model:'', months:36, fee:0, care:'' }; }
 function newQuote(){
   return { items:[newItem()], card:{ name:'', tier:-1, off:0 }, freed:{ counts:[0,0,0,0,0,0] }, extras:[] };
 }
@@ -467,6 +477,12 @@ function manwon(v){ return v % 10000 === 0 ? n2(v / 10000) + '만원' : n2(v) + 
 function freedTotal(p){ return (Number(p.off)||0) * 60; }
 function freedUnit(p, months){ const m = Number(months)||60; return Math.round(freedTotal(p) / m); }
 function quoteMonths(q){ let ms = q.items.filter(it => (Number(it.fee)||0) > 0 || String(it.name||'').trim()).map(it => Number(it.months)||60); if(!ms.length) ms = q.items.map(it => Number(it.months)||60); return ms.length ? Math.max.apply(null, ms) : 60; }
+function eqLines(monthly, months, sub, extra, total, mixed, periodLabel){
+  const L = [mixed ? `${periodLabel} 구독 합계 ${n2(sub)}원` : `월 ${n2(monthly)}원 × ${months}개월 = ${n2(sub)}원`];
+  if(extra > 0){ L.push(`− 추가행사 캐시백 ${n2(extra)}원`); L.push(`체감 제품가격 ${n2(total)}원`); }
+  return L;
+}
+function mulText(a, n, t){ return `월 ${n2(a)}원 × ${n}개월 ${a * n === t ? '=' : '≒'} ${n2(t)}원`; }
 function calcQuote(q, st){
   const items = q.items.filter(it => (Number(it.fee)||0) > 0 || String(it.name||'').trim());
   const baseMonthly = items.reduce((s,it)=> s + (Number(it.fee)||0), 0);
@@ -475,17 +491,20 @@ function calcQuote(q, st){
   const fm = quoteMonths(q);
   const freedOff = plans.reduce((s,p,i)=> s + freedUnit(p, fm) * (Number(q.freed.counts[i])||0), 0);
   const slots = plans.reduce((s,p,i)=> s + (Number(q.freed.counts[i])||0), 0);
+  const freedMaturity = plans.reduce((s,p,i)=> s + freedPrice(p) * (Number(q.freed.counts[i])||0), 0);
   const extraOff = q.extras.reduce((s,e)=> s + Math.max(0, Number(e.off)||0), 0);
   const totalOff = cardOff + freedOff + extraOff;
-  const monthly = baseMonthly - totalOff;   // 할인 합계가 더 크면 마이너스(고객이 매월 돌려받는 구조)
   const monthsList = items.length ? items.map(it => Number(it.months)||60) : q.items.map(it => Number(it.months)||60);
   const maxMonths = monthsList.length ? Math.max.apply(null, monthsList) : 60;
   const minMonths = monthsList.length ? Math.min.apply(null, monthsList) : 60;
   const mixed = minMonths !== maxMonths;
   const principal = items.reduce((s,it)=> s + (Number(it.fee)||0) * (Number(it.months)||60), 0);
-  const total = principal - totalOff * maxMonths;
-  return { items, baseMonthly, cardOff, freedOff, slots, extraOff, totalOff, monthly,
-           maxMonths, minMonths, mixed, principal, total, refund: monthly < 0 && baseMonthly > 0 };
+  const monthlyOff = cardOff + freedOff;                       // 매월 적용되는 혜택(카드·구독플러스)
+  const monthly = baseMonthly - monthlyOff;                 // 월 체감가 (마이너스면 돌려받는 구조)
+  const subTotal = principal - monthlyOff * maxMonths;      // 월 체감가 × 개월수로 도출된 금액
+  const total = subTotal - extraOff;                        // 추가행사 캐시백은 여기서 차감 → 최종 체감 제품가격
+  return { items, baseMonthly, cardOff, freedOff, slots, freedMaturity, extraOff, totalOff, monthly,
+           maxMonths, minMonths, mixed, principal, subTotal, total, refund: monthly < 0 && baseMonthly > 0, refundTotal: total < 0 ? -total : 0 };
 }
 
 function normalizeRecog(o){
@@ -559,7 +578,7 @@ function applyRecogToQuote(q, data, replace, st){
 /* =====================================================================
    상태
 ===================================================================== */
-let quotes = [newQuote(), newQuote()];
+let quotes = [newQuote()];
 let qi = 0;
 let draft = null;
 let recogLast = null;
@@ -715,7 +734,7 @@ function renderHome(){
   </section>
 
   <section class="card">
-    <div class="step-title"><h2>STEP 01 · 맞춤 견적 &amp; 카드 혜택 설계</h2><span class="chip blue">견적 화면에서 전산 사진 인식 지원</span></div>
+    <div class="step-title"><h2>STEP 01 · 맞춤 견적 &amp; 카드 혜택 설계</h2><span class="chip blue">36개월 기본 · 카드/구독플러스 혜택 계산</span></div>
     <div class="tiles">
       <button class="tile" data-go="quote"><b>구독 견적</b><span>품목 · 카드 · 프리드 자동 계산</span></button>
       <button class="tile light" data-go="care"><b>📋 안심케어 조견표</b><span>${esc(CARE_MONTH)} 안심케어 · 가전이사</span></button>
@@ -746,21 +765,23 @@ function renderHome(){
 /* =====================================================================
    견적 화면
 ===================================================================== */
+function contractText(it){
+  const f = Number(it.fee)||0, m = Number(it.months)||36;
+  return f > 0 ? `계약금액 ${n2(f * m)}원 (${m}개월)` : '월 요금을 입력하면 계약금액이 자동 계산돼요';
+}
 function itemsHTML(q){
   return q.items.map((it,i) => `
    <div class="item">
      <div class="item-row">
-       <input class="in grow" placeholder="품목 (예: 냉장고)" data-f="name" data-i="${i}" value="${esc(it.name)}">
-       <input class="in grow" placeholder="모델명" data-f="model" data-i="${i}" value="${esc(it.model)}">
+       <span class="item-no">구독 ${i+1}</span>
        <div class="seg small">
          <button class="segbtn ${it.months===36?'on':''}" data-act="months" data-i="${i}" data-v="36">36개월</button>
          <button class="segbtn ${it.months===60?'on red':''}" data-act="months" data-i="${i}" data-v="60">60개월</button>
        </div>
-       <div class="money"><input class="in" inputmode="numeric" placeholder="월 요금" data-f="fee" data-i="${i}" value="${it.fee?esc(it.fee):''}"><span>원</span></div>
+       <div class="money"><input class="in fee-in" inputmode="numeric" placeholder="월 요금" data-f="fee" data-i="${i}" value="${it.fee?esc(it.fee):''}"><span>원</span></div>
      </div>
+     <div class="contract" id="ct${i}">${contractText(it)}</div>
      <div class="item-row sub">
-       <input class="in grow" list="careList" placeholder="케어 서비스" data-f="care" data-i="${i}" value="${esc(it.care)}">
-       <span class="chip">${it.months}개월</span>
        <span class="chip red">🛡 5년 무상 A/S 기본 포함</span>
        ${q.items.length>1 ? `<button class="icon-btn" data-act="delItem" data-i="${i}" aria-label="품목 삭제">✕</button>` : ''}
      </div>
@@ -779,7 +800,7 @@ function enforceCard60(){
 function cardSectionHTML(q){
   const cfg = settings.cards.find(c => c.name === q.card.name);
   return `<div class="card">
-    <div class="sec-head"><h2>2. 제휴카드 및 월 사용금액 구간</h2></div>
+    <div class="sec-head"><h2>3. 제휴카드 및 월 사용금액 구간</h2></div>
     <div class="flexwrap">
       ${settings.cards.map(cd => { const off = needs60(q) && !card60Ok(cd.name); return `<button class="pill ${q.card.name===cd.name?'on':''}${off?' dis':''}" data-act="card" data-v="${esc(cd.name)}" ${off?'disabled aria-disabled="true"':''}>${esc(cd.name)}</button>`; }).join('')}
       <button class="pill ${!q.card.name?'on':''}" data-act="card" data-v="">미적용</button>
@@ -795,47 +816,40 @@ function cardSectionHTML(q){
 function freedSectionHTML(q, c){
   const plans = settings.freed.plans; const max = settings.freed.maxSlots;
   return `<div class="card">
-    <div class="sec-head"><h2>3. 구독프리드 (Hi구독 플러스)</h2>
-      <div class="row-gap"><span class="chip blue">총 ${c.slots}구좌 / 최대 ${max}구좌 (월 -${n2(c.freedOff)}원)</span>
+    <div class="sec-head"><h2>2. Hi 구독플러스(적립형 결합상품)</h2>
+      <div class="row-gap"><span class="chip blue">총 ${c.slots}구좌 / 최대 ${max}구좌 (월 -${n2(c.freedOff)}원)${c.slots>0 ? ' · 만기 원금 합계 ' + manwon(c.freedMaturity) : ''}</span>
       <button class="btn ghost" data-act="freedReset">↺ 미적용(초기화)</button></div></div>
     <div class="grid3 keep">
       ${plans.map((p,i) => { const cnt = Number(q.freed.counts[i])||0; return `
-        <div class="plan ${cnt>0?'on':''}"><b>${esc(p.name)}</b><span class="red-t">월 -${n2(freedUnit(p, c.maxMonths))}원 지원</span><small class="ctr pt">총 ${freedTotal(p)%10000===0 ? n2(freedTotal(p)/10000)+'만원' : n2(freedTotal(p))+'원'}<br>÷ ${c.maxMonths}개월</small>${freedPay(p) > 0 ? `<small class="ctr pt" style="color:#4B5563">월 ${n2(freedPay(p))}원 ${FREED_PAY_TIMES}회 납입<br>${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치 후 만기 원금 ${manwon(freedPrice(p))}</small>` : ''}
+        <div class="plan ${cnt>0?'on':''}"><b>${esc(p.name)}</b><span class="red-t">월 -${n2(freedUnit(p, c.maxMonths))}원 지원</span><small class="ctr pt">총 ${freedTotal(p)%10000===0 ? n2(freedTotal(p)/10000)+'만원' : n2(freedTotal(p))+'원'}<br>÷ ${c.maxMonths}개월</small>${freedPay(p) > 0 ? `<small class="ctr pt" style="color:#4B5563">${cnt>0 ? cnt : 1}구좌 월 ${n2(freedPay(p)*Math.max(cnt,1))}원 ${FREED_PAY_TIMES}회 납입<br>${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치 후</small><span class="mat ${cnt>0?'':'off'}">만기 원금 ${manwon(freedPrice(p)*Math.max(cnt,1))}</span>` : ''}
           <div class="stepper"><button class="step" data-act="freedDec" data-i="${i}" ${cnt<=0?'disabled':''} aria-label="줄이기">−</button><span>${cnt}개</span>
           <button class="step plus" data-act="freedInc" data-i="${i}" ${c.slots>=max?'disabled':''} aria-label="늘리기">＋</button></div></div>`; }).join('')}
     </div></div>`;
 }
 function extraSectionHTML(q){
   return `<div class="card">
-    <div class="sec-head"><h2>4. 기타 할인 · 프로모션</h2><button class="btn soft" data-act="addExtra">＋ 할인 추가</button></div>
-    ${q.extras.length ? q.extras.map((e,i) => `
+    <div class="sec-head"><h2>4. 추가행사</h2><button class="btn soft" data-act="addExtra">＋ 캐시백 추가</button></div>
+    ${q.extras.map((e,i) => `
       <div class="item-row">
-        <input class="in grow" placeholder="할인 이름 (예: 이벤트 할인)" data-f="extraLabel" data-i="${i}" value="${esc(e.label)}">
-        <div class="money"><input class="in" inputmode="numeric" placeholder="월 할인액" data-f="extraOff" data-i="${i}" value="${e.off?esc(e.off):''}"><span>원</span></div>
+        <span class="item-no">캐시백</span>
+        <div class="money"><input class="in" inputmode="numeric" placeholder="캐시백 금액" data-f="extraOff" data-i="${i}" value="${e.off?esc(e.off):''}"><span>원</span></div>
         <button class="icon-btn" data-act="delExtra" data-i="${i}" aria-label="삭제">✕</button>
-      </div>`).join('') : '<div class="muted">전산 사진에서 읽은 추가 프로모션이나, 협의한 월 할인을 여기에 추가하세요. 계산에 바로 반영돼요.</div>'}
+      </div>`).join('')}
+    <div class="muted" style="margin-top:6px">캐시백 금액을 입력하면 최종 혜택가에 반영돼 체감 제품가격이 그만큼 낮아져요.</div>
   </div>`;
 }
 
 function renderQuote(){
   enforceCard60();
+  if(!quotes[qi].extras.length) quotes[qi].extras.push({ label:'', off:0 });
   const q = quotes[qi]; const c = calcQuote(q, settings);
   fillCareList();
   $('#quoteRoot').innerHTML = `
   <div class="qhead"><button class="btn ghost" data-go="home">← 처음 메뉴로</button><div class="qtitle">구독 구매 견적서</div></div>
 
-  <div class="card tabs-card">
-    <div class="seg">
-      ${[0,1].map(i => `<button class="segbtn ${i===qi?'on':''}" data-act="qtab" data-i="${i}">견적 ${i+1}안 <small id="tabTotal${i}"></small></button>`).join('')}
-    </div>
-    <button class="btn soft" data-act="copyQuote">${qi+1}안 내용 → ${qi===0?2:1}안 복사</button>
-  </div>
-
   <div class="card">
-    <div class="sec-head"><h2>1. 구독 품목 및 월요금 (${qi+1}안)</h2>
+    <div class="sec-head"><h2>1. 구독 품목 및 월요금</h2>
       <div class="row-gap">
-        <button class="btn soft" data-act="photoCam">📷 전산화면 촬영</button>
-        <button class="btn soft" data-act="photoFile">🖼 사진 불러오기</button>
         <button class="btn primary" data-act="addItem">＋ 품목 추가</button>
         <button class="btn ghost" data-act="resetQuote">↺ 초기화</button>
       </div></div>
@@ -843,8 +857,8 @@ function renderQuote(){
     <div class="sum-line"><span class="l" id="periodNote"></span><span id="baseTotal"></span></div>
   </div>
 
-  ${cardSectionHTML(q)}
   ${freedSectionHTML(q, c)}
+  ${cardSectionHTML(q)}
   ${extraSectionHTML(q)}
 
   <div class="card">
@@ -856,11 +870,7 @@ function renderQuote(){
 
 function updateSummary(){
   const q = quotes[qi]; const c = calcQuote(q, settings);
-  [0,1].forEach(i => {
-    const el = $('#tabTotal' + i); if(!el) return;
-    const ci = calcQuote(quotes[i], settings);
-    el.textContent = ci.items.length ? `(월 ${n2(ci.monthly)}원)` : '';
-  });
+  q.items.forEach((it,i) => { const el = $('#ct' + i); if(el) el.textContent = contractText(it); });
   const pn = $('#periodNote');
   if(pn){
     if(!c.items.length) pn.textContent = '품목과 월 요금을 입력하세요';
@@ -873,47 +883,47 @@ function updateSummary(){
   const rb = $('#resultBox');
   if(rb){
     rb.innerHTML = `<div>
-      <div class="r-title">실시간 예상 최종 월 체감가 (${qi+1}안 · ${c.maxMonths}개월)</div>
-      <div class="r-sub">기본 ${n2(c.baseMonthly)} − 카드 ${n2(c.cardOff)} − 프리드 ${n2(c.freedOff)}${c.extraOff>0 ? ' − 기타 ' + n2(c.extraOff) : ''}</div>
-      ${c.refund ? `<div class="warn ok">💰 할인 합계가 월 구독료보다 커서 매월 ${n2(-c.monthly)}원을 오히려 돌려받는 구조예요.<br><b>총 환급액 ${n2(-c.monthly * c.maxMonths)}원</b> (월 ${n2(-c.monthly)}원 × ${c.maxMonths}개월)</div>` : ''}
+      <div class="r-title">실시간 예상 최종 월 체감가 (${c.maxMonths}개월)</div>
+      <div class="r-calc">${eqLines(c.monthly, c.maxMonths, c.subTotal, c.extraOff, c.total, c.mixed, c.minMonths + '~' + c.maxMonths + '개월').map((t,k,arr) => k === arr.length-1 ? '<b>' + t + '</b>' : t).join('<br>')}</div>
+      <div class="r-sub">기본 ${n2(c.baseMonthly)} − 구독플러스 ${n2(c.freedOff)} − 카드 ${n2(c.cardOff)}</div>
+      ${c.refund ? `<div class="warn ok">💰 할인 합계가 월 구독료보다 커서 매월 ${n2(-c.monthly)}원을 오히려 돌려받는 구조예요.<br><b>총 환급액 ${n2(c.refundTotal)}원</b> (월 ${n2(-c.monthly)}원 × ${c.maxMonths}개월${c.extraOff>0 ? ' + 캐시백 ' + n2(c.extraOff) + '원' : ''})</div>` : ''}
       ${c.mixed ? '<div class="warn">기간이 다른 품목이 섞여 있어요. 할인은 가장 긴 기간 기준으로 계산했어요.</div>' : ''}
     </div><div class="r-big ${c.refund ? 'neg' : ''}">월 ${n2(c.monthly)}원</div>`;
   }
   const fv = $('#floatValue'); if(fv) fv.textContent = `월 ${n2(c.monthly)}원`;
-  const fl = $('#floatLabel'); if(fl) fl.textContent = `${qi+1}안 예상 월 체감가`;
+  const fl = $('#floatLabel'); if(fl) fl.textContent = '예상 월 체감가';
 }
 
 /* =====================================================================
    제안서
 ===================================================================== */
 function proposalModel(q, c){
-  const names = c.items.map(i => String(i.name || '').trim() || '구독 상품');
-  const title = names.length <= 1 ? (names[0] || '구독 상품') : names.length <= 3 ? names.join(' · ') : `${names[0]} 외 ${names.length-1}건`;
+  const title = '구독 상품';
   const periodLabel = c.mixed ? `${c.minMonths}~${c.maxMonths}개월` : `${c.maxMonths}개월`;
-  const items = c.items.map(it => ({
-    name: String(it.name || '').trim() || '구독 상품', model: String(it.model || '').trim(), months: Number(it.months)||60,
+  const items = c.items.map((it,k) => ({
+    name: String(it.name || '').trim() || ('구독 상품' + (c.items.length > 1 ? ' ' + (k+1) : '')), model: String(it.model || '').trim(), months: Number(it.months)||60,
     fee: Number(it.fee)||0, contract: (Number(it.fee)||0) * (Number(it.months)||60),
-    care: [String(it.care || '').trim(), '5년 무상 A/S 보장'].filter(Boolean).join(' · ')
+    care: '5년 무상 A/S 보장'
   }));
   const lines = [];
+  if(c.freedOff > 0){
+    const parts = settings.freed.plans.map((p,i) => (Number(q.freed.counts[i])||0) > 0 ? `${p.name} ${q.freed.counts[i]}구좌` : '').filter(Boolean).join(', ');
+    lines.push({ kind:'freed', label:'(-) Hi 구독플러스(적립형 결합상품) 월 지원금', sub:`${parts} · 총 ${manwon(c.freedOff*c.maxMonths)} ÷ ${c.maxMonths}개월`, amount:c.freedOff, total:c.freedOff*c.maxMonths,
+      info: settings.freed.plans.map((p,i) => { const n = Number(q.freed.counts[i])||0; return n > 0 && freedPay(p) > 0 ? `${p.name} ${n}구좌: 월 ${n2(freedPay(p)*n)}원 ${FREED_PAY_TIMES}회 납입 → ${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치(${FREED_PAY_TIMES+1}~${FREED_TOTAL_TIMES}회) → 만기 시 원금 ${manwon(freedPrice(p)*n)}` : ''; }).filter(Boolean).concat(c.slots > 1 ? ['만기 원금 합계 ' + manwon(c.freedMaturity)] : []).join(' / ') });
+  }
   if(c.cardOff > 0){
     const cfg = settings.cards.find(cd => cd.name === q.card.name);
     const tier = cfg && q.card.tier >= 0 ? cfg.tiers[q.card.tier] : null;
     lines.push({ kind:'card', label:`(-) 제휴카드 월 캐시백${q.card.name ? ` (${q.card.name})` : ''}`,
       sub:`${tier && tier.spend ? `전월 실적 ${tier.spend} 이상 · ` : ''}${c.maxMonths}개월간 매월 캐시백`, amount:c.cardOff, total:c.cardOff*c.maxMonths });
   }
-  if(c.freedOff > 0){
-    const parts = settings.freed.plans.map((p,i) => (Number(q.freed.counts[i])||0) > 0 ? `${p.name} ${q.freed.counts[i]}구좌` : '').filter(Boolean).join(', ');
-    lines.push({ kind:'freed', label:'(-) 구독프리드 (Hi구독 플러스) 월 지원금', sub:`${parts} · 총 ${manwon(c.freedOff*c.maxMonths)} ÷ ${c.maxMonths}개월`, amount:c.freedOff, total:c.freedOff*c.maxMonths,
-      info: settings.freed.plans.map((p,i) => { const n = Number(q.freed.counts[i])||0; return n > 0 && freedPay(p) > 0 ? `${p.name} ${n}구좌: 월 ${n2(freedPay(p)*n)}원 ${FREED_PAY_TIMES}회 납입 → ${FREED_TOTAL_TIMES-FREED_PAY_TIMES}회 거치(${FREED_PAY_TIMES+1}~${FREED_TOTAL_TIMES}회) → 만기 시 원금 ${manwon(freedPrice(p)*n)}` : ''; }).filter(Boolean).join(' / ') });
-  }
-  q.extras.forEach(e => { const a = digits(e.off); if(a > 0) lines.push({ kind:'extra', label:`(-) ${String(e.label || '').trim() || '추가 할인'}`, sub:`${c.maxMonths}개월간 월 할인`, amount:a, total:a*c.maxMonths }); });
-  const chipParts = ['월 구독료'].concat(lines.map(l => l.kind === 'card' ? '카드캐시백' : l.kind === 'freed' ? '구독프리드' : l.label.replace('(-) ','')));
+  q.extras.forEach(e => { const a = digits(e.off); if(a > 0) lines.push({ kind:'extra', lump:true, label:'(-) 추가행사 캐시백', sub:'월 체감가 × 개월수 금액에서 차감 → 체감 제품가격에 반영', amount:a, total:a }); });
+  const chipParts = ['월 구독료'].concat(lines.map(l => l.kind === 'card' ? '카드캐시백' : l.kind === 'freed' ? 'Hi 구독플러스' : l.kind === 'extra' ? '추가행사 캐시백' : l.label.replace('(-) ','')));
   const d = new Date();
   return {
     empty: !items.length, title, periodLabel, items, lines, chip: chipParts.join(' — '),
     base: c.baseMonthly, monthly: c.monthly, total: c.total, principal: c.principal, months: c.maxMonths,
-    allSixty: true, refund: c.refund, mixed: c.mixed,
+    allSixty: true, refund: c.refund, refundTotal: c.refundTotal, mixed: c.mixed, sub: c.subTotal, extra: c.extraOff, eq: eqLines(c.monthly, c.maxMonths, c.subTotal, c.extraOff, c.total, c.mixed, periodLabel),
     dateStr: `${d.getFullYear()}.${pad2(d.getMonth()+1)}.${pad2(d.getDate())}`
   };
 }
@@ -924,18 +934,17 @@ function renderProposal(){
   const tools = `
   <div class="ptool">
     <button class="btn ghost" data-go="quote">← 조건 수정</button>
-    <div class="seg">${[0,1].map(i => `<button class="segbtn ${i===qi?'on':''}" data-act="ptab" data-i="${i}">${i+1}안 <small>${(()=>{ const ci = calcQuote(quotes[i], settings); return ci.items.length ? '(월 ' + n2(ci.monthly) + ')' : ''; })()}</small></button>`).join('')}</div>
     <div class="row-gap"><button class="btn soft" data-act="copyText">텍스트 복사</button><button class="btn primary" data-act="saveImage">이미지 저장</button><button class="btn dark" data-act="print">인쇄</button></div>
   </div>`;
   if(m.empty){
-    $('#proposalRoot').innerHTML = tools + `<div class="card"><h2>${qi+1}안에 입력된 품목이 없어요</h2><p class="muted">‘조건 수정’에서 품목과 월 요금을 입력해주세요.</p></div>`;
+    $('#proposalRoot').innerHTML = tools + `<div class="card"><h2>입력된 품목이 없어요</h2><p class="muted">‘조건 수정’에서 품목과 월 요금을 입력해주세요.</p></div>`;
     return;
   }
   $('#proposalRoot').innerHTML = tools + `
   <div class="paper" id="proposalPaper">
     <div class="p-head">
-      <div><span class="tag">맞춤 구독 설계안</span><h1>${esc(m.title)} 구독 제안서 (${esc(m.periodLabel)} 구독)</h1></div>
-      <div class="badge">${m.allSixty ? '품목별 맞춤 케어 · 5년 무상 A/S 보장' : '품목별 맞춤 케어'}</div>
+      <div><span class="tag">맞춤 구독 설계안</span><h1>구독 제안서 (${esc(m.periodLabel)} 구독)</h1></div>
+      <div class="badge">5년 무상 A/S 보장</div>
     </div>
     <div class="p-box">
       ${m.items.map(it => `<div class="p-item">
@@ -943,27 +952,29 @@ function renderProposal(){
         <div class="fee">월 ${n2(it.fee)}원<small class="ctr">계약금액 ${n2(it.contract)}원 (${it.months}개월)</small></div></div>`).join('')}
       ${m.items.length > 1 ? `<div class="p-total"><span>총 월 구독료 합계</span><span>월 ${n2(m.base)}원</span></div>` : ''}
     </div>
-    ${m.lines.map(l => `<div class="p-line"><div><div class="lb">${esc(l.label)}</div><div class="sb">${esc(l.sub)}</div>${l.info ? `<div class="sb inf">${esc(l.info).split(' / ').join('<br>')}</div>` : ''}</div><div class="am">월 -${n2(l.amount)}원<small class="ctr">${m.months}개월 혜택 합계 ${n2(l.total)}원</small></div></div>`).join('')}
+    ${m.lines.map(l => `<div class="p-line"><div><div class="lb">${esc(l.label)}</div><div class="sb">${esc(l.sub)}</div>${l.info ? `<div class="sb inf">${esc(l.info).split(' / ').join('<br>')}</div>` : ''}</div><div class="am">${l.lump ? '' : '월 '}-${n2(l.amount)}원<small class="ctr">${l.lump ? '캐시백 (최종 혜택가 반영)' : m.months + '개월 혜택 합계 ' + n2(l.total) + '원'}</small></div></div>`).join('')}
     <div class="p-final ${m.refund ? 'refund' : ''}">
       <span class="ch">${esc(m.chip)}</span>
       <div class="t">${m.refund ? '💰' : '🎯'} 최종 월 체감가 (${esc(m.periodLabel)} 구독)</div>
       <div class="big">월 ${n2(m.monthly)}원</div>
-      ${m.refund ? `<div class="rf">매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요</div><div class="rf2">총 환급액 <b>${n2(-m.monthly * m.months)}원</b><small>(월 ${n2(-m.monthly)}원 × ${m.months}개월)</small></div>` : ''}
+      <div class="calc">${m.eq.map((t,k,arr) => k === arr.length-1 ? '<b>' + esc(t) + '</b>' : esc(t)).join('<br>')}</div>
+      ${m.refund ? `<div class="rf">매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요</div><div class="rf2">총 환급액 <b>${n2(m.refundTotal)}원</b><small>(월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})</small></div>` : ''}
     </div>
-    <div class="p-sum"><span style="font-weight:800">최종 ${esc(m.periodLabel)} 체감가 합계${m.refund ? ' (총 환급)' : ''}</span><span><b>${n2(m.total)}원</b><small>(원금 ${n2(m.principal)}원)</small></span></div>
+    <div class="p-sum"><span style="font-weight:800">최종 ${esc(m.periodLabel)} 체감 제품가격${m.total < 0 ? ' (총 환급)' : ''}</span><span><b>${n2(m.total)}원</b><small>(원금 ${n2(m.principal)}원)</small></span></div>
     <div class="p-foot">작성일 ${esc(m.dateStr)} · 실제 적용 조건은 계약 시 확정됩니다</div>
   </div>`;
 }
 
 function quoteText(){
   const q = quotes[qi]; const c = calcQuote(q, settings); const m = proposalModel(q, c);
-  const L = [`[구독 견적 ${qi+1}안]`];
+  const L = ['[구독 견적]'];
   m.items.forEach(it => L.push(`${it.name}${it.model ? ' (' + it.model + ')' : ''} · ${it.months}개월 · 월 ${n2(it.fee)}원 (계약금액 ${n2(it.contract)}원)`));
   if(m.items.length > 1) L.push(`총 월 구독료 합계: ${n2(m.base)}원`);
-  m.lines.forEach(l => { L.push(`${l.label}: -${n2(l.amount)}원 (${m.months}개월 합계 ${n2(l.total)}원)`); if(l.info) L.push('   · ' + l.info); });
+  m.lines.forEach(l => { L.push(l.lump ? `${l.label}: -${n2(l.amount)}원 (최종 혜택가 반영)` : `${l.label}: -${n2(l.amount)}원 (${m.months}개월 합계 ${n2(l.total)}원)`); if(l.info) L.push('   · ' + l.info); });
   L.push(`▶ 최종 월 체감가: ${n2(m.monthly)}원${m.refund ? ' (매월 ' + n2(-m.monthly) + '원 환급)' : ''}`);
-  if(m.refund) L.push(`▶ 총 환급액: ${n2(-m.monthly * m.months)}원 (월 ${n2(-m.monthly)}원 × ${m.months}개월)`);
-  L.push(`▶ ${m.periodLabel} 체감가 합계: ${n2(m.total)}원${m.refund ? ' (총 환급)' : ''} (원금 ${n2(m.principal)}원)`);
+  m.eq.forEach(t => L.push('   · ' + t));
+  if(m.refund) L.push(`▶ 총 환급액: ${n2(m.refundTotal)}원 (월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})`);
+  L.push(`▶ ${m.periodLabel} 체감 제품가격: ${n2(m.total)}원${m.refund ? ' (총 환급)' : ''} (원금 ${n2(m.principal)}원)`);
   return L.join('\n');
 }
 async function copyText(){
@@ -1006,7 +1017,7 @@ async function saveImage(){
   rr(x, P, y, IW, 160, 30); x.fillStyle = '#111827'; x.fill();
   x.font = `700 24px ${FONT}`; x.fillStyle = '#FDA4AF'; x.fillText('맞춤 구독 설계안', P+36, y+52);
   x.font = `900 46px ${FONT}`; x.fillStyle = '#FFFFFF';
-  x.fillText(fitText(x, `${m.title} 구독 제안서 (${m.periodLabel} 구독)`, IW-72), P+36, y+116);
+  x.fillText(fitText(x, `구독 제안서 (${m.periodLabel} 구독)`, IW-72), P+36, y+116);
   y += 160 + 24;
 
   const n = m.items.length, rowH = 108, itemsH = 24 + n*rowH + (n > 1 ? 70 : 0) + 8;
@@ -1020,7 +1031,7 @@ async function saveImage(){
     x.fillText(fitText(x, meta, 470), P+32, ry+84);
     x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#111827';
     x.fillText(`월 ${n2(it.fee)}원`, W-P-32, ry+50);
-    x.font = `600 22px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`계약금액 ${n2(it.contract)}원 (${it.months}개월)`, W-P-32, ry+86);
+    x.font = `600 20px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`계약금액 ${n2(it.contract)}원 (${it.months}개월)`, W-P-32, ry+86);
     ry += rowH;
   });
   if(n > 1){
@@ -1038,26 +1049,27 @@ async function saveImage(){
     x.textAlign = 'left'; x.font = `800 30px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, l.label, 640), P+32, y+46);
     x.font = `500 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(fitText(x, l.sub, 640), P+32, y+84);
     infoLines.forEach((ln, k) => { x.textAlign = 'left'; x.font = `700 20px ${FONT}`; x.fillStyle = '#1E3A8A'; x.fillText(fitText(x, ln, IW-72), P+32, y+126+k*32); });
-    x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#2F5BFF'; x.fillText(`월 -${n2(l.amount)}원`, W-P-32, y+56);
-    x.font = `600 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(`${m.months}개월 혜택 합계 ${n2(l.total)}원`, W-P-32, y+90);
+    x.textAlign = 'right'; x.font = `900 40px ${FONT}`; x.fillStyle = '#2F5BFF'; x.fillText(`${l.lump ? '' : '월 '}-${n2(l.amount)}원`, W-P-32, y+56);
+    x.font = `600 22px ${FONT}`; x.fillStyle = '#4B5563'; x.fillText(l.lump ? '캐시백 (최종 혜택가 반영)' : `${m.months}개월 혜택 합계 ${n2(l.total)}원`, W-P-32, y+90);
     y += h + 16;
   });
   x.textAlign = 'left';
 
-  y += 8; const fh = m.refund ? 440 : 300;
+  y += 8; const sh = (m.eq.length - 1) * 44; const fh = (m.refund ? 500 : 340) + sh;
   rr(x, P, y, IW, fh, 30); x.fillStyle = m.refund ? '#ECFDF5' : '#FEF2F4'; x.fill(); x.lineWidth = 3; x.strokeStyle = m.refund ? '#34D399' : '#FB7185'; x.stroke();
   x.textAlign = 'center';
   x.font = `500 24px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(fitText(x, m.chip, IW-80), W/2, y+62);
   x.font = `800 30px ${FONT}`; x.fillStyle = m.refund ? '#047857' : '#BE123C'; x.fillText(`최종 월 체감가 (${m.periodLabel} 구독)`, W/2, y+112);
   x.font = `900 112px ${FONT}`; x.fillStyle = m.refund ? '#059669' : '#E11D48'; x.fillText(`월 ${n2(m.monthly)}원`, W/2, y+236);
-  if(m.refund){ x.font = `800 32px ${FONT}`; x.fillStyle = '#047857'; x.fillText(`💰 매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요`, W/2, y+300);
-    x.font = `900 46px ${FONT}`; x.fillStyle = '#065F46'; x.fillText(`총 환급액 ${n2(-m.monthly * m.months)}원`, W/2, y+368);
-    x.font = `600 24px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`(월 ${n2(-m.monthly)}원 × ${m.months}개월)`, W/2, y+408); }
+  x.font = `700 30px ${FONT}`; x.fillStyle = '#4B5563'; m.eq.forEach((t, k) => { x.font = (k === m.eq.length - 1 && m.eq.length > 1 ? '900' : '700') + ` 30px ${FONT}`; x.fillText(t, W/2, y+290+k*44); });
+  if(m.refund){ x.font = `800 32px ${FONT}`; x.fillStyle = '#047857'; x.fillText(`💰 매월 ${n2(-m.monthly)}원을 오히려 돌려받는 구조예요`, W/2, y+356+sh);
+    x.font = `900 46px ${FONT}`; x.fillStyle = '#065F46'; x.fillText(`총 환급액 ${n2(m.refundTotal)}원`, W/2, y+424+sh);
+    x.font = `600 24px ${FONT}`; x.fillStyle = '#6B7280'; x.fillText(`(월 ${n2(-m.monthly)}원 × ${m.months}개월${m.extra>0 ? ' + 캐시백 ' + n2(m.extra) + '원' : ''})`, W/2, y+464+sh); }
   x.textAlign = 'left';
   y += fh + 20;
 
   rr(x, P, y, IW, 112, 26); x.fillStyle = '#111827'; x.fill();
-  x.font = `700 30px ${FONT}`; x.fillStyle = '#FFFFFF'; x.fillText(`최종 ${m.periodLabel} 체감가 합계${m.refund ? ' (총 환급)' : ''}`, P+32, y+68);
+  x.font = `700 30px ${FONT}`; x.fillStyle = '#FFFFFF'; x.fillText(`최종 ${m.periodLabel} 체감 제품가격${m.total < 0 ? ' (총 환급)' : ''}`, P+32, y+68);
   x.textAlign = 'right'; x.font = `500 24px ${FONT}`; x.fillStyle = '#9CA3AF';
   const sub = `(원금 ${n2(m.principal)}원)`; x.fillText(sub, W-P-32, y+66);
   const sw = x.measureText(sub).width;
@@ -1074,7 +1086,7 @@ async function saveImage(){
   out.toBlob(blob => {
     if(!blob){ toast('이미지를 만들지 못했어요'); return; }
     const url = URL.createObjectURL(blob); const a = document.createElement('a');
-    a.href = url; a.download = `구독제안서_${qi+1}안_${m.dateStr.replace(/\./g,'')}.png`;
+    a.href = url; a.download = `구독제안서_${m.dateStr.replace(/\./g,'')}.png`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     toast('이미지를 저장했어요');
@@ -1499,7 +1511,7 @@ function drawSettings(){
   </section>
 
   <section class="card">
-    <h2>구독프리드 (Hi구독 플러스)</h2>
+    <h2>Hi 구독플러스(적립형 결합상품)</h2>
     <p class="muted">플랜 이름과 <b>60개월 기준</b> 구좌당 월 지원금을 입력하세요. (플러스 72 = 월 12,000원 × 60 = 총 72만원). 36개월 구독에 적용하면 총 지원금을 36으로 나눠 자동 계산돼요 (72만원 → 월 20,000원). 월 납입금은 1~90회 납입 금액이고 만기 원금(예: 40,000원×90회 = 360만원)은 자동 계산되며 36개월·60개월 지원 모두 같아요. 1~90회 납입 후 91~120회(30회)는 거치 기간이에요.</p>
     <table class="cfg">${d.freed.plans.map((p, pi) => `<tr>
       <td style="width:42%"><input class="in" data-path="freed.plans.${pi}.name" value="${esc(p.name)}"></td>
@@ -1521,12 +1533,10 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if(!el) return;
   const act = el.dataset.act; const i = Number(el.dataset.i); const q = quotes[qi];
   switch(act){
-    case 'qtab': qi = i; renderQuote(); break;
     case 'months': q.items[i].months = Number(el.dataset.v) === 36 ? 36 : 60; renderQuote(); break;
     case 'addItem': q.items.push(newItem()); renderQuote(); break;
     case 'delItem': q.items.splice(i, 1); if(!q.items.length) q.items.push(newItem()); renderQuote(); break;
-    case 'resetQuote': if(confirm(`${qi+1}안 내용을 모두 지울까요?`)){ quotes[qi] = newQuote(); renderQuote(); } break;
-    case 'copyQuote': { const o = qi === 0 ? 1 : 0; quotes[o] = clone(quotes[qi]); qi = o; renderQuote(); toast(`${o === 1 ? 1 : 2}안 내용을 ${o+1}안으로 복사했어요`); break; }
+    case 'resetQuote': if(confirm('입력한 내용을 모두 지울까요?')){ quotes[qi] = newQuote(); renderQuote(); } break;
     case 'card': {
       const nm = el.dataset.v;
       if(nm && needs60(q) && !card60Ok(nm)){ toast('60개월 구독은 롯데제휴카드만 가능해요'); break; }
@@ -1551,11 +1561,8 @@ document.addEventListener('click', async e => {
       if(!c.items.length || c.baseMonthly <= 0){ toast('품목과 월 요금을 먼저 입력해주세요'); break; }
       go('proposal'); break;
     }
-    case 'photoCam': $('#photoCam').click(); break;
-    case 'photoFile': $('#photoFile').click(); break;
     case 'closeModal': closeModal(); break;
     case 'applyRecog': applyRecogFromModal(); break;
-    case 'ptab': qi = i; renderProposal(); break;
     case 'copyText': copyText(); break;
     case 'saveImage': saveImage(); break;
     case 'print': window.print(); break;
@@ -1807,7 +1814,8 @@ function openLinkModal(){
 ===================================================================== */
 fillCareList();
 refreshAiBtn();
-showView(location.hash.slice(1) || 'home');
+if(location.hash && location.hash !== '#home'){ try{ history.replaceState(null, '', location.pathname + location.search + '#home'); }catch(_){ } }
+showView('home');
 loadCareCustom();
 checkReminders();
 </script>
